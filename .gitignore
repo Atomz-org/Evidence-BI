@@ -11,3 +11,7 @@ static/data
 
 # derived — synced from the dbt project by scripts/sync-dbt.sh
 sources/dbt_semantic/*.duckdb
+
+# graphify local state (machine-specific paths, caches, intermediates)
+graphify-out/cache/
+graphify-out/.graphify_*

@@ -87,6 +87,26 @@ npm run build          # production build (fails on broken queries — the CI ga
 npm run preview        # preview the production build
 ```
 
+## Knowledge graph (agent retrieval)
+
+`graphify-out/graph.json` is a queryable knowledge graph of this project with
+**column-level lineage**: page → query file (frontmatter + `${}` chains) →
+source extract → dbt mart, and column → column edges whose `context` carries
+the defining SQL expression. graphify's AST pass can't see Evidence's
+frontmatter conventions, so after any `/graphify` rebuild re-inject lineage:
+
+```bash
+$(cat graphify-out/.graphify_python) scripts/graphify-lineage.py   # needs sqlglot
+```
+
+Agents answer metric questions from the graph in <0.5s instead of reading files:
+
+```bash
+graphify explain "revenue_trailing_28d.revenue_trailing_28d"   # definition, upstream cols, consumers
+graphify query "which pages use order_amount_usd?"
+graphify path "Revenue Overview" "marts.fct_orders"
+```
+
 ## Evidence docs
 
 - [Evidence docs](https://docs.evidence.dev/) · [GitHub](https://github.com/evidence-dev/evidence) · [all evidence-dev repos](https://github.com/orgs/evidence-dev/repositories)

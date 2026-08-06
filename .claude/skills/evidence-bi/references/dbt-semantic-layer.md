@@ -118,6 +118,25 @@ the flagship dashboards, same as their exports feed `bi_marts`.
    identically. Ratio metrics that exclude guests from a numerator (e.g.
    `emea_revenue_share`) inherit that from the YAML filter, never from a page.
 
+## Column lineage in the knowledge graph
+
+`graphify-out/graph.json` carries the full lineage this file describes, machine-
+queryable: `loads_query` (frontmatter), `references_query` (`${}` chains),
+`reads_table`, `derived_from` (through to the dbt marts), and per-column
+`has_column` / `derives_from` / `uses_column` edges whose `context` holds the
+defining SQL expression. Before reading files to answer "how is metric X
+computed" or "what breaks if column Y changes", query the graph — it is faster
+and already resolves CTEs:
+
+```bash
+graphify explain "revenue_trailing_28d.revenue_trailing_28d"
+graphify query "what depends on orders.order_amount_usd?"
+```
+
+The AST pass cannot see Evidence frontmatter, so `scripts/graphify-lineage.py`
+(sqlglot-based, deterministic, idempotent) must re-run after any `/graphify`
+rebuild — and after adding a page, metric file, or changing a query's columns.
+
 ## Alternative integration modes (when not on DuckDB)
 
 - **Warehouse exports** (BigQuery/Snowflake): dbt `saved_queries` exports land
