@@ -107,11 +107,18 @@ graphify query "which pages use order_amount_usd?"
 graphify path "Revenue Overview" "marts.fct_orders"
 ```
 
-## Upstream Evidence source (`vendor/evidence`)
+## Upstream Evidence source (`vendor/`)
 
-The Evidence monorepo is vendored as a **git submodule** pinned to a commit on
-`main`, so component APIs can be read, diffed, and traced locally instead of
-guessed from docs.
+Two upstream repos are vendored as **git submodules**, each pinned to a commit
+on `main`, so component and connector APIs can be read, diffed, and traced
+locally instead of guessed from docs:
+
+| Path | Upstream | Contains |
+|---|---|---|
+| `vendor/evidence` | [evidence-dev/evidence](https://github.com/evidence-dev/evidence) | core-components, CLI, all bundled connectors |
+| `vendor/evidence-datasources` | [evidence-dev/datasources](https://github.com/evidence-dev/datasources) | Google Sheets + InfluxDB connectors |
+
+Together they cover **all 15** packages in `package.json`.
 
 ```bash
 git submodule update --init --recursive --depth 1   # first checkout (or clone with --recurse-submodules)
@@ -124,14 +131,15 @@ Two things to be clear about:
 - **A submodule pins a commit — upstream changes are not picked up silently.**
   That is the point: the sync script is the deliberate update, and the pointer
   move gets committed and reviewed like any other change.
-- **The app runs against `node_modules`, not this checkout.** The submodule is
-  the readable reference (unminified source, stories, tests, git history). The
-  sync script's drift check compares vendored versions against the ones
-  `package.json` installs — currently all 14 match.
+- **The app runs against `node_modules`, not these checkouts.** The submodules
+  are the readable reference (unminified source, stories, tests, git history).
+  The sync script's drift check compares vendored versions against the ones
+  `package.json` installs — currently all 15 match.
 
-The Google Sheets connector lives in a separate repo
-([evidence-dev/datasources](https://github.com/evidence-dev/datasources)) and so
-is not part of this checkout.
+Note that `evidence-dev/datasources` is a low-traffic repo (last upstream push
+June 2024), so the Google Sheets connector there moves far more slowly than the
+main monorepo. A `--check` run that reports "no upstream change" for it is
+normal, not a broken fetch.
 
 `vendor/` is excluded from the knowledge graph via `.graphifyignore` — ~3k
 upstream files would swamp this project's own graph. To graph it, run

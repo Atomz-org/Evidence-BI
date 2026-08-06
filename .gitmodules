@@ -2,3 +2,7 @@
 	path = vendor/evidence
 	url = https://github.com/evidence-dev/evidence.git
 	branch = main
+[submodule "vendor/evidence-datasources"]
+	path = vendor/evidence-datasources
+	url = https://github.com/evidence-dev/datasources.git
+	branch = main
