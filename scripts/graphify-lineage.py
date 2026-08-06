@@ -104,7 +104,14 @@ def main() -> None:
         rel = str(f.relative_to(ROOT))
         fid = by_file.get(rel)
         if not fid:
-            continue
+            # graphify's AST pass cannot parse .sql without tree_sitter_sql, so a
+            # newly added query file has no node to hang lineage off. Mint one —
+            # this injector is the reason SQL is in the graph at all, and it must
+            # not silently skip a file just because the AST pass produced nothing.
+            fid = "sqlfile__" + rel.replace("/", "_")[:-4]
+            add_node(fid, f.stem, "query", rel,
+                     description=f"SQL query file ({rel})")
+            by_file[rel] = fid
         sql = f.read_text(encoding="utf-8")
         try:
             parsed = sqlglot.parse_one(sql, dialect="duckdb")

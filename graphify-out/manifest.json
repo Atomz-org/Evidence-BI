@@ -90,14 +90,14 @@
     "semantic_hash": "17b34c1142707825f8ce87c6497f04f7"
   },
   ".claude/skills/evidence-bi/references/components.md": {
-    "mtime": 1786037462.082992,
-    "ast_hash": "48009e4a07723cd9da940fd20a05531c",
-    "semantic_hash": "48009e4a07723cd9da940fd20a05531c"
+    "mtime": 1786059665.960582,
+    "ast_hash": "8deb6aec39a497f3921d38fe0904084d",
+    "semantic_hash": ""
   },
   ".claude/skills/evidence-bi/references/dbt-semantic-layer.md": {
-    "mtime": 1786037508.5108318,
-    "ast_hash": "4f463584fc1a5995bcda4d22f5b493a7",
-    "semantic_hash": "4f463584fc1a5995bcda4d22f5b493a7"
+    "mtime": 1786052647.052729,
+    "ast_hash": "5e597ac0b49e6992fd424be495414586",
+    "semantic_hash": ""
   },
   ".claude/skills/evidence-bi/references/design-principles.md": {
     "mtime": 1786035983.5996017,
@@ -105,9 +105,9 @@
     "semantic_hash": "2a02364b3298a05603639b05b38af1f3"
   },
   "README.md": {
-    "mtime": 1786041372.9822283,
-    "ast_hash": "ddfe9e7d0dc4d53cca3871d440f068d5",
-    "semantic_hash": "ddfe9e7d0dc4d53cca3871d440f068d5"
+    "mtime": 1786059676.7519772,
+    "ast_hash": "a25d19dcd1ec2267f01bc306a7e82e3b",
+    "semantic_hash": ""
   },
   "evidence.config.yaml": {
     "mtime": 1786041019.8478687,
@@ -115,19 +115,19 @@
     "semantic_hash": "54c5bda517adb139f49b1139cd68404f"
   },
   "pages/index.md": {
-    "mtime": 1786041198.477522,
-    "ast_hash": "cffa3de42ad559dfa2a30daf1c99f248",
-    "semantic_hash": "cffa3de42ad559dfa2a30daf1c99f248"
+    "mtime": 1786059519.1106606,
+    "ast_hash": "1f5e709b120aacceec2a778438385190",
+    "semantic_hash": ""
   },
   "pages/metrics.md": {
-    "mtime": 1786040706.2104933,
-    "ast_hash": "c94325a08c2d3c7d3079459af1eee048",
-    "semantic_hash": "c94325a08c2d3c7d3079459af1eee048"
+    "mtime": 1786059527.1834307,
+    "ast_hash": "7abc167c99118da345187a0129825b0f",
+    "semantic_hash": ""
   },
   "pages/regions/[region].md": {
-    "mtime": 1786041201.1565874,
-    "ast_hash": "b55435f61b427838b18a60c7d499088f",
-    "semantic_hash": "b55435f61b427838b18a60c7d499088f"
+    "mtime": 1786059290.2149456,
+    "ast_hash": "4b3926ffbc58dd46cff7f60289cad75b",
+    "semantic_hash": ""
   },
   "pages/regions/index.md": {
     "mtime": 1786041203.6552186,
@@ -138,5 +138,35 @@
     "mtime": 1786037540.869988,
     "ast_hash": "1ea6988d2fa2715ae5ba7ec45812388f",
     "semantic_hash": "1ea6988d2fa2715ae5ba7ec45812388f"
+  },
+  "queries/metrics/revenue_by_dimensions.sql": {
+    "mtime": 1786058830.6450937,
+    "ast_hash": "c9e4516e1238faaae0f23ec075ed9cdb",
+    "semantic_hash": ""
+  },
+  "scripts/graphify-lineage.py": {
+    "mtime": 1786049208.7778685,
+    "ast_hash": "0ef8aae6a54044a5ca3a7e0d9a9e11c0",
+    "semantic_hash": ""
+  },
+  "scripts/sync-evidence-upstream.sh": {
+    "mtime": 1786054167.6458127,
+    "ast_hash": "2c8e5bddb95cbb352cd8edaad7d6915e",
+    "semantic_hash": ""
+  },
+  ".claude/scratchpad.txt": {
+    "mtime": 1786053137.8789062,
+    "ast_hash": "78861f73dd2345b27a791b70d6c0e5ce",
+    "semantic_hash": ""
+  },
+  "pages/showcase.md": {
+    "mtime": 1786059360.198687,
+    "ast_hash": "ba77f12edad8d5f06b02cd7f876a1653",
+    "semantic_hash": ""
+  },
+  "sources/needful_things/connection.yaml": {
+    "mtime": 1770395163.0,
+    "ast_hash": "9511f604920a2735feaecf55f5173bd1",
+    "semantic_hash": ""
   }
 }

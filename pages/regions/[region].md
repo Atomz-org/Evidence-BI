@@ -15,7 +15,7 @@ select min(metric_time) as start_date, max(metric_time) as end_date
 from ${metrics_revenue}
 ```
 
-<DateRange name=date_range data={date_bounds} dates=start_date defaultValue="All Time"/>
+<DateRange name=date_range data={date_bounds} dates=start_date defaultValue="Last 30 Days"/>
 
 ```sql kpi
 with cur as (

@@ -40,6 +40,14 @@ To rebuild the dbt project first: `REBUILD=1 ./scripts/sync-dbt.sh`
 - **`/` Revenue Overview** — executive dashboard: KPI row with previous-period
   comparisons, cumulative momentum (trailing 28d, MTD), MoM growth, daily trend,
   weekly revenue by region, and a drill table.
+- **`/showcase` Feature Tour** — the demo page. Ten chapters, each answering a
+  real question *and* naming the capability behind it: prose that recomputes,
+  a four-input filter row, KPIs with previous-period deltas, a trend whose grain
+  and target line are driven by inputs, composition + weekday heatmap,
+  distribution (histogram / box plot), a Sankey of region→order-state, country
+  concentration, chip-based cross-filtering with no SQL, a table with in-cell
+  bars, deltas, colour scales and sparklines, and the governance trail from
+  dbt YAML → compiled SQL → page.
 - **`/regions/<region>`** — templated drill-down per region: filtered KPIs,
   trend, and a full order log for audit.
 - **`/metrics` Metric Dictionary** — every metric's definition, type, caveats,

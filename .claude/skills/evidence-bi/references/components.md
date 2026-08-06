@@ -100,6 +100,46 @@ select distinct region from ${metrics_revenue} order by region
   `<Dropdown name=status><DropdownOption value="%" valueLabel="All"/></Dropdown>`
   consumed as `like '${inputs.status.value}'`.
 
+**`defaultValue="All Time"` silently kills every previous-period comparison** —
+the prior window falls entirely before the data, so `revenue_growth` is null and
+the delta renders blank. Default to a bounded preset (`Last 30 Days`) on any page
+whose KPIs carry `comparison=`.
+
+### ButtonGroup and Slider — inputs that reshape the query
+
+```markdown
+<ButtonGroup name=grain title="Grain">
+  <ButtonGroupItem valueLabel="Day" value="day"/>
+  <ButtonGroupItem valueLabel="Week" value="week" default/>
+  <ButtonGroupItem valueLabel="Month" value="month"/>
+</ButtonGroup>
+
+<Slider name=target title="Daily target" min=1000 max=10000 step=250
+  defaultValue=6000 fmt=usd0 showInput=true/>
+```
+
+- Both write a **bare scalar** to the input store — consume as `'${inputs.grain}'`
+  (quoted, it is a string) and `${inputs.target}` (unquoted, it is a number).
+  Neither takes `.value`; that is Dropdown-only.
+- `default` on a `ButtonGroupItem` is a bare attribute, not `default=true`.
+- A grain button rewrites `date_trunc('${inputs.grain}', metric_time)`; a slider
+  feeds `<ReferenceLine y={inputs.target}/>` directly in markup, where plain JS
+  works: `y={inputs.target * (inputs.grain === 'week' ? 7 : 1)}`.
+- `<ButtonGroup preset=dates/>` ships `Week | Month | Year` as `7 days` /
+  `1 month` / `1 year` — the only built-in preset.
+
+### DimensionGrid — cross-filter with no SQL
+
+```markdown
+<DimensionGrid data={cut_source} metric="sum(revenue)" metricLabel="Revenue"
+  name=cut fmt=usd0k limit=6/>
+```
+
+Feed it a query of **categorical columns plus the measure**; it renders a chip
+per value per dimension and writes a ready-made predicate to `inputs.<name>`,
+consumed as `where ${inputs.cut}` (no quotes — it is SQL). With nothing selected
+it emits `true`, so the query is always valid. Selections combine with `AND`.
+
 ## Charts
 
 ```markdown
@@ -118,6 +158,51 @@ select distinct region from ${metrics_revenue} order by region
   `<ReferenceArea xMin='2026-07-01' xMax='2026-07-15'/>` as children of the chart.
 - `chartAreaHeight=<px>` when the default is too short for a full-width trend.
 - No `y2` with a different unit. Ever.
+
+Annotations take theme status colours by name, and `hideValue` suppresses the
+number in the label:
+
+```markdown
+<ReferenceLine y=7500 label="Target" hideValue labelPosition=aboveStart color=positive/>
+<ReferencePoint x='2026-07-04' y=6590 label="Launch" labelPosition=bottom color=negative/>
+```
+
+### Beyond the four core forms
+
+Each of these answers a job the line/bar/table trio cannot. Props verified
+against 5.4.x — note that several use **their own column props**, not `x`/`y`.
+
+```markdown
+<AreaChart data={mix} x=period y=revenue series=region type=stacked100
+  title="Revenue mix"/>                                 <!-- share, not level -->
+
+<Heatmap data={grid} x=weekday y=region value=revenue xSort=dow
+  valueFmt=usd0k cellHeight=34/>                        <!-- 1 measure, 2 dimensions -->
+
+<Histogram data={daily} x=revenue xFmt=usd0k/>          <!-- shape of one measure -->
+
+<BoxPlot data={spread} name=region min=low intervalBottom=q1
+  midpoint=median_day intervalTop=q3 max=high swapXY=true/>
+
+<BubbleChart data={by_country} x=order_count y=average_order_value
+  size=revenue series=region sizeFmt=usd0k/>            <!-- 3 measures, no 2nd axis -->
+
+<SankeyDiagram data={flow} sourceCol=source targetCol=target valueCol=value
+  valueFmt=usd0k linkColor=source nodeLabels=full/>     <!-- allocation across 2 dimensions -->
+```
+
+- **`Heatmap` sorts categories by a companion column** — `xSort=dow` with a
+  numeric `dow` in the query, or weekdays come out alphabetical.
+- **`BoxPlot` does not compute quantiles.** Pass pre-computed columns
+  (`quantile_cont(x, 0.25)` in DuckDB) and map them to
+  `min` / `intervalBottom` / `midpoint` / `intervalTop` / `max`.
+- **`SankeyDiagram` uses `sourceCol` / `targetCol` / `valueCol`**, not `x`/`y`.
+  `linkColor=source` colours flows by their origin; `orient=vertical` flips it.
+- `FunnelChart` takes `nameCol` / `valueCol` — use it only for genuine stage
+  progression. Mutually exclusive states (order statuses) are **not** a funnel;
+  that is a Sankey or a bar.
+- `CalendarHeatmap` (`date=` + `value=`) needs a year or more of daily data to
+  read well — on a six-week window it is mostly empty cells.
 
 ## DataTable
 
@@ -138,7 +223,36 @@ select distinct region from ${metrics_revenue} order by region
   where falling is good). `contentType=colorscale scaleColor=blue` → sequential
   shading (magnitude job only).
 - `search=true rows=25` for lookup tables; `totalRow=true` for finance tables;
-  `groupBy=` + `subtotals=true` for grouped finance views.
+  `groupBy=` + `subtotals=true` for grouped finance views;
+  `downloadable=true` for the export button.
+
+Cell content types (`contentType=` on `<Column>`):
+
+| Value | Renders | Needs |
+|---|---|---|
+| `delta` | ▲/▼ + signed value | a **change**, not a level — `downIsGood=true` for costs |
+| `colorscale` | sequential shading | `scaleColor=blue`; magnitude only |
+| `bar` | in-cell bar | `barColor=` optional |
+| `sparkline` / `sparkarea` / `sparkbar` | in-cell mini chart | `sparkX=` `sparkY=` |
+| `link` / `image` | anchor / img | `linkLabel=`, `openInNewTab=` |
+
+A sparkline column needs a **list of structs** in that cell, keyed to match
+`sparkX` / `sparkY`:
+
+```sql
+select region,
+       array_agg({'week': week, 'revenue': revenue} order by week) as trend
+from weekly group by 1
+```
+
+```markdown
+<Column id=trend title="Weekly" contentType=sparkline sparkX=week sparkY=revenue/>
+```
+
+`npm run build` prints `[!] Evidence does not support DuckDB Struct or Array`
+for that column — it comes from the query **size-estimator**, not the renderer,
+and the sparkline works. Grain matters: aggregate the array at the same grain as
+the row, or every row in a group shows the same trend.
 
 ## Drill-down (templated pages)
 
@@ -169,10 +283,35 @@ reviewable.
 
 - `<Grid cols=2 gapSize=md>…</Grid>` for breakdown pairs; `cols=4` for KPI rows.
 - `<Tabs><Tab label="Trend">…</Tab><Tab label="Table">…</Tab></Tabs>` when a
-  chart and its table view compete for space.
+  chart and its table view compete for space. This is how "the table is always
+  reachable" costs no vertical space.
 - `<Details title="How this metric is defined">…</Details>` for metric
   definitions pulled from dbt YAML descriptions — keep dashboards self-documenting.
-- `<Alert status=warning>…</Alert>` for data-quality caveats.
+- `<Accordion><AccordionItem title="…">…</AccordionItem></Accordion>` when
+  several such disclosures belong together (definition / compiled SQL / page).
+- `<Alert status=warning>…</Alert>` for data-quality caveats; `<Modal
+  title="…" buttonText="…">…</Modal>` for the long-form aside a dashboard
+  shouldn't carry inline.
+- `<DownloadData data={q} text="Download"/>` beside any table someone will ask
+  for in a spreadsheet; `<LastRefreshed prefix="Sources built"/>` in the header.
+- `<LinkButton url='/metrics'>Metric dictionary</LinkButton>` for cross-page
+  navigation.
+
+### Numbers inside prose
+
+```markdown
+Revenue reached <Value data={kpi} column=revenue fmt=usd0k/> across
+<Value data={kpi} column=order_count fmt=num0/> orders.
+```
+
+`<Value>` takes `column=` (not `value=`), defaults to `row=0`, and accepts the
+same `fmt` strings as charts. `<Delta data={kpi} column=revenue_growth fmt=pct1
+chip=true/>` renders an inline arrow chip. Interpolated inputs work in titles
+too: `title="Revenue by {inputs.grain}"`.
+
+A commentary sentence built from `<Value>` recomputes with the data — it is the
+cheapest defence against a deck that goes stale between the build and the
+meeting.
 
 ## Format strings (pick once per measure, reuse everywhere)
 
