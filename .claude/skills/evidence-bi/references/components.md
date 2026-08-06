@@ -1,9 +1,13 @@
 # Evidence component cookbook
 
 Verified against the installed `@evidence-dev/core-components` 5.4.x /
-`@evidence-dev/evidence` 40.x in this project (`node_modules` is ground truth;
-upstream source: github.com/evidence-dev/evidence). Every snippet below uses
-props that exist in this version.
+`@evidence-dev/evidence` 40.x in this project. `node_modules` is what actually
+runs, but the **readable** source of truth is the pinned upstream checkout at
+[`vendor/evidence/packages/ui/core-components/src/`](../../../../vendor/evidence)
+— same versions, unminified, with stories and tests. Read props there
+(`git -C vendor/evidence log` for history); confirm against `node_modules` if
+the two ever drift (`./scripts/sync-evidence-upstream.sh --check`). Every
+snippet below uses props that exist in this version.
 
 ## Queries
 

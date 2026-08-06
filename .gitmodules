@@ -1,0 +1,4 @@
+[submodule "vendor/evidence"]
+	path = vendor/evidence
+	url = https://github.com/evidence-dev/evidence.git
+	branch = main

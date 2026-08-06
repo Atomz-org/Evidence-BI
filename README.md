@@ -107,6 +107,36 @@ graphify query "which pages use order_amount_usd?"
 graphify path "Revenue Overview" "marts.fct_orders"
 ```
 
+## Upstream Evidence source (`vendor/evidence`)
+
+The Evidence monorepo is vendored as a **git submodule** pinned to a commit on
+`main`, so component APIs can be read, diffed, and traced locally instead of
+guessed from docs.
+
+```bash
+git submodule update --init --recursive --depth 1   # first checkout (or clone with --recurse-submodules)
+./scripts/sync-evidence-upstream.sh                 # pull latest upstream + report version drift
+./scripts/sync-evidence-upstream.sh --check         # drift report only, no fetch
+```
+
+Two things to be clear about:
+
+- **A submodule pins a commit — upstream changes are not picked up silently.**
+  That is the point: the sync script is the deliberate update, and the pointer
+  move gets committed and reviewed like any other change.
+- **The app runs against `node_modules`, not this checkout.** The submodule is
+  the readable reference (unminified source, stories, tests, git history). The
+  sync script's drift check compares vendored versions against the ones
+  `package.json` installs — currently all 14 match.
+
+The Google Sheets connector lives in a separate repo
+([evidence-dev/datasources](https://github.com/evidence-dev/datasources)) and so
+is not part of this checkout.
+
+`vendor/` is excluded from the knowledge graph via `.graphifyignore` — ~3k
+upstream files would swamp this project's own graph. To graph it, run
+`/graphify vendor/evidence` separately.
+
 ## Evidence docs
 
 - [Evidence docs](https://docs.evidence.dev/) · [GitHub](https://github.com/evidence-dev/evidence) · [all evidence-dev repos](https://github.com/orgs/evidence-dev/repositories)
