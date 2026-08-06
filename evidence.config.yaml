@@ -1,0 +1,91 @@
+# Theme: validated instance of the dataviz color method (see .claude/skills/evidence-bi).
+# Categorical palettes pass all six checks (lightness band, chroma floor, adjacent-pair
+# CVD dE >= 8, normal-vision dE >= 15, contrast) on this project's real surfaces:
+# light #ffffff, dark #09090b. The dark palette is the same eight hues re-stepped for
+# the dark surface — not a copy of the light one. Slot ORDER is the CVD-safety
+# mechanism: never reorder, never append hues. Light-mode slots 3-5 (aqua, yellow,
+# magenta) are below 3:1 on white — charts leaning on them need visible labels or a
+# companion table (the "relief rule").
+appearance:
+  default: system
+  switcher: true
+
+theme:
+  colorPalettes:
+    default:
+      light:
+        - "#2a78d6" # 1 blue
+        - "#eb6834" # 2 orange
+        - "#1baf7a" # 3 aqua    (relief rule on light)
+        - "#eda100" # 4 yellow  (relief rule on light)
+        - "#e87ba4" # 5 magenta (relief rule on light)
+        - "#008300" # 6 green
+        - "#4a3aa7" # 7 violet
+        - "#e34948" # 8 red
+      dark:
+        - "#3987e5"
+        - "#d95926"
+        - "#199e70"
+        - "#c98500"
+        - "#d55181"
+        - "#008300"
+        - "#9085e9"
+        - "#e66767"
+  colorScales:
+    # Sequential = one hue (blue), light->dark. On the dark surface the ramp is
+    # reversed so "near zero" recedes toward the surface and magnitude pops light.
+    default:
+      light:
+        - "#cde2fb"
+        - "#3987e5"
+        - "#0d366b"
+      dark:
+        - "#104281"
+        - "#3987e5"
+        - "#9ec5f4"
+  colors:
+    primary:
+      light: "#256abf"
+      dark: "#3987e5"
+    accent:
+      light: "#eb6834"
+      dark: "#d95926"
+    base:
+      light: "#ffffff"
+      dark: "#09090b"
+    # Status colors are reserved (deltas, alerts) — never reused as series colors.
+    info:
+      light: "#2a78d6"
+      dark: "#3987e5"
+    positive:
+      light: "#0ca30c"
+      dark: "#0ca30c"
+    warning:
+      light: "#fab219"
+      dark: "#fab219"
+    negative:
+      light: "#d03b3b"
+      dark: "#d03b3b"
+
+plugins:
+  components:
+    "@evidence-dev/core-components": {}
+
+  datasources:
+    # All connectors stay available — the dbt saved_query exports can land in any
+    # warehouse (BigQuery/Snowflake/etc.), and an Evidence source of the matching
+    # adapter picks them up without config surgery.
+    # See .claude/skills/evidence-bi/references/dbt-semantic-layer.md.
+    "@evidence-dev/bigquery": { }
+    "@evidence-dev/connector-gsheets": { }
+    "@evidence-dev/csv": { }
+    "@evidence-dev/databricks": { }
+    "@evidence-dev/duckdb": { }
+    "@evidence-dev/mssql": { }
+    "@evidence-dev/mysql": { }
+    "@evidence-dev/postgres": { }
+    "@evidence-dev/source-javascript": { }
+    "@evidence-dev/snowflake": { }
+    "@evidence-dev/sqlite": { }
+    "@evidence-dev/trino": { }
+    "@evidence-dev/motherduck": { }

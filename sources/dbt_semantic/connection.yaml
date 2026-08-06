@@ -1,0 +1,6 @@
+# dbt semantic-layer source. The .duckdb file here is DERIVED — synced from the
+# dbt project's dev.duckdb by scripts/sync-dbt.sh. Never edit it; re-sync instead.
+name: dbt_semantic
+type: duckdb
+options:
+  filename: dbt_semantic.duckdb
