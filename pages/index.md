@@ -16,7 +16,8 @@ metric (`models/semantic/_metrics.yml`), compiled to `queries/metrics/`.
 
 New here? The [Feature Tour](/showcase) walks the whole capability surface —
 cross-filtering, drill-through, distributions, flow, and the governance trail
-behind every number — on this same data.
+behind every number — on this same data. For the formal, print-ready version of
+these figures see the [Order Revenue Performance report](/reports/revenue-performance).
 
 ```sql date_bounds
 select min(metric_time) as start_date, max(metric_time) as end_date

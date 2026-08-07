@@ -86,3 +86,11 @@ mechanical — see `references/dbt-semantic-layer.md`.
 | `references/design-principles.md` | Form choice, page anatomy, color system, anti-patterns |
 | `references/components.md` | Exact Evidence syntax for every job (KPIs, filters, drills, tables) |
 | `references/dbt-semantic-layer.md` | The dbt→Evidence contract: sync, compilation rules, governance |
+| `references/enterprise-reporting.md` | Management/board packs: control block, accounting formats, comparatives, materiality, print |
+
+**Dashboard or report?** A dashboard is scanned and operated; a report is circulated,
+cited and archived. Both share this palette and this metric contract, but a report also
+carries a control block, a basis of preparation, numbered exhibits with source lines, and
+accounting number formats (adverse values in parentheses). When the ask is a management
+pack, board pack, MI, or anything destined for PDF, read
+`references/enterprise-reporting.md` as well.

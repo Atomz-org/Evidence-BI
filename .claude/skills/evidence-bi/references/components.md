@@ -313,6 +313,26 @@ A commentary sentence built from `<Value>` recomputes with the data — it is th
 cheapest defence against a deck that goes stale between the build and the
 meeting.
 
+## Code fences are queries — even the ones you meant as documentation
+
+**A fenced code block at the top level of a page is extracted as a query, and its info
+string becomes the query id** — whatever language you tag it with, and whether you use
+three backticks or four. ` ```text ` registers a query named `text`, which fails to parse
+and renders an error box on the page.
+
+To display code that must not run:
+
+- **indent it four spaces** — no info string, nothing to extract (safest); or
+- **nest the fence inside an HTML element** (`<Details>`, `<AccordionItem>`) — which is
+  why the four-backtick blocks inside the feature tour's accordion are safe.
+
+`npm run build` surfaces it as `<id> | Error in Query!`; confirm with the page's
+registered query list:
+
+```bash
+python3 -c "import json;print([q['id'] for q in json.load(open('build/api/<route>/evidencemeta.json'))['queries']])"
+```
+
 ## Format strings (pick once per measure, reuse everywhere)
 
 | Measure | fmt | Renders |
@@ -327,3 +347,10 @@ meeting.
 
 `pct` formats expect fractions (0.689 → 68.9%) — compute ratios as fractions in
 SQL, not pre-multiplied by 100.
+
+**Accounting formats** (reports — adverse values in parentheses) are registered in
+`.evidence/customization/custom-formatting.json` and used by tag like any built-in:
+`usdacc`, `usdacc2`, `usdacck`, `numacc`, `pctacc`, `rptdate`, `rptmonth`. Evidence
+formats through SSF, so Excel's `positive;negative` section syntax works
+(`$#,##0;($#,##0)`). Add new formats to that file — never inline a raw format code into a
+page. → `enterprise-reporting.md`

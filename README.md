@@ -48,6 +48,13 @@ To rebuild the dbt project first: `REBUILD=1 ./scripts/sync-dbt.sh`
   concentration, chip-based cross-filtering with no SQL, a table with in-cell
   bars, deltas, colour scales and sparklines, and the governance trail from
   dbt YAML → compiled SQL → page.
+- **`/reports/revenue-performance` Order Revenue Performance** — the same figures as
+  a management report rather than a dashboard: control block (report ID, period,
+  data as-of, owner, classification), queried comparatives, accounting number
+  formats (adverse values in parentheses), numbered exhibits each naming the
+  compiled query behind it, a materiality threshold on small-base movements, and a
+  basis-of-preparation section with the metric register and lineage. Sections break
+  onto their own pages in print and the filter row is hidden.
 - **`/regions/<region>`** — templated drill-down per region: filtered KPIs,
   trend, and a full order log for audit.
 - **`/metrics` Metric Dictionary** — every metric's definition, type, caveats,
@@ -65,6 +72,9 @@ project and encodes:
   against the installed version
 - `references/dbt-semantic-layer.md` — the dbt→Evidence compilation contract
   (simple / ratio / derived / cumulative metrics, naming, governance)
+- `references/enterprise-reporting.md` — management/board packs: control block,
+  basis of preparation, accounting formats, queried comparatives, materiality,
+  print and export
 
 The chart palettes in `evidence.config.yaml` pass all six checks of the dataviz
 color validator (lightness band, chroma floor, CVD ΔE ≥ 8, normal-vision

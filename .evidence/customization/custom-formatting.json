@@ -1,4 +1,54 @@
 {
   "version": "1.0",
-  "customFormats": []
+  "customFormats": [
+    {
+      "formatTag": "usdacc",
+      "formatCode": "$#,##0;($#,##0)",
+      "formatCategory": "currency",
+      "valueType": "number",
+      "exampleInput": -1234.5
+    },
+    {
+      "formatTag": "usdacc2",
+      "formatCode": "$#,##0.00;($#,##0.00)",
+      "formatCategory": "currency",
+      "valueType": "number",
+      "exampleInput": -1234.5
+    },
+    {
+      "formatTag": "usdacck",
+      "formatCode": "$#,##0.0,\"k\";($#,##0.0,\"k\")",
+      "formatCategory": "currency",
+      "valueType": "number",
+      "exampleInput": -42000
+    },
+    {
+      "formatTag": "numacc",
+      "formatCode": "#,##0;(#,##0)",
+      "formatCategory": "number",
+      "valueType": "number",
+      "exampleInput": -1234
+    },
+    {
+      "formatTag": "pctacc",
+      "formatCode": "0.0%;(0.0%)",
+      "formatCategory": "percent",
+      "valueType": "number",
+      "exampleInput": -0.0007
+    },
+    {
+      "formatTag": "rptdate",
+      "formatCode": "dd mmm yyyy",
+      "formatCategory": "date",
+      "valueType": "date",
+      "exampleInput": "2026-08-04"
+    },
+    {
+      "formatTag": "rptmonth",
+      "formatCode": "mmm yyyy",
+      "formatCategory": "date",
+      "valueType": "date",
+      "exampleInput": "2026-08-04"
+    }
+  ]
 }

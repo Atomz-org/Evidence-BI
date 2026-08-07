@@ -1,8 +1,8 @@
 {
   ".evidence/customization/custom-formatting.json": {
-    "mtime": 1770395163.0,
-    "ast_hash": "236baa878b988d4bf3d463b814505fa4",
-    "semantic_hash": "236baa878b988d4bf3d463b814505fa4"
+    "mtime": 1786063289.9876988,
+    "ast_hash": "1a82c4792fe3f5fe8e5488bd0f9b2c77",
+    "semantic_hash": ""
   },
   ".vscode/extensions.json": {
     "mtime": 1770395163.0,
@@ -85,13 +85,13 @@
     "semantic_hash": "f719f214f8fc6cf36107ac0f6d5e61e0"
   },
   ".claude/skills/evidence-bi/SKILL.md": {
-    "mtime": 1786035927.202538,
-    "ast_hash": "17b34c1142707825f8ce87c6497f04f7",
-    "semantic_hash": "17b34c1142707825f8ce87c6497f04f7"
+    "mtime": 1786064184.856467,
+    "ast_hash": "898aa7a3d3db8b134a0f337dea1158b0",
+    "semantic_hash": ""
   },
   ".claude/skills/evidence-bi/references/components.md": {
-    "mtime": 1786059665.960582,
-    "ast_hash": "8deb6aec39a497f3921d38fe0904084d",
+    "mtime": 1786064233.8423567,
+    "ast_hash": "7f5a28dfc432c24c3a0a5b1c9f487912",
     "semantic_hash": ""
   },
   ".claude/skills/evidence-bi/references/dbt-semantic-layer.md": {
@@ -105,8 +105,8 @@
     "semantic_hash": "2a02364b3298a05603639b05b38af1f3"
   },
   "README.md": {
-    "mtime": 1786059676.7519772,
-    "ast_hash": "a25d19dcd1ec2267f01bc306a7e82e3b",
+    "mtime": 1786064250.8568819,
+    "ast_hash": "7fd97ed38a9b4c362f5c6198be75cae4",
     "semantic_hash": ""
   },
   "evidence.config.yaml": {
@@ -115,8 +115,8 @@
     "semantic_hash": "54c5bda517adb139f49b1139cd68404f"
   },
   "pages/index.md": {
-    "mtime": 1786059519.1106606,
-    "ast_hash": "1f5e709b120aacceec2a778438385190",
+    "mtime": 1786063375.1328547,
+    "ast_hash": "fd9a54ed4aaff3a6015e58186575b137",
     "semantic_hash": ""
   },
   "pages/metrics.md": {
@@ -145,8 +145,8 @@
     "semantic_hash": ""
   },
   "scripts/graphify-lineage.py": {
-    "mtime": 1786049208.7778685,
-    "ast_hash": "0ef8aae6a54044a5ca3a7e0d9a9e11c0",
+    "mtime": 1786059803.3794618,
+    "ast_hash": "d7600610d6c8ebccb86bbee57b9e6d79",
     "semantic_hash": ""
   },
   "scripts/sync-evidence-upstream.sh": {
@@ -167,6 +167,16 @@
   "sources/needful_things/connection.yaml": {
     "mtime": 1770395163.0,
     "ast_hash": "9511f604920a2735feaecf55f5173bd1",
+    "semantic_hash": ""
+  },
+  ".claude/skills/evidence-bi/references/enterprise-reporting.md": {
+    "mtime": 1786064172.7600036,
+    "ast_hash": "dd84ca88484044900335a3fe40e85600",
+    "semantic_hash": ""
+  },
+  "pages/reports/revenue-performance.md": {
+    "mtime": 1786064050.2022674,
+    "ast_hash": "7b9965ed9bfade319cb8af0857e813c8",
     "semantic_hash": ""
   }
 }
