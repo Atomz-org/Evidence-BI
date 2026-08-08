@@ -1,0 +1,172 @@
+{
+  ".evidence/customization/custom-formatting.json": {
+    "mtime": 1770395163.0,
+    "ast_hash": "236baa878b988d4bf3d463b814505fa4",
+    "semantic_hash": "236baa878b988d4bf3d463b814505fa4"
+  },
+  ".vscode/extensions.json": {
+    "mtime": 1770395163.0,
+    "ast_hash": "8fbdd895ee9320c9fc9d1e398608e1fe",
+    "semantic_hash": "8fbdd895ee9320c9fc9d1e398608e1fe"
+  },
+  "degit.json": {
+    "mtime": 1770395163.0,
+    "ast_hash": "030c1fb082f933b67b46536c5bcdb175",
+    "semantic_hash": "030c1fb082f933b67b46536c5bcdb175"
+  },
+  "package.json": {
+    "mtime": 1786041018.5205579,
+    "ast_hash": "f439f336479836d65ca2a84bf666477b",
+    "semantic_hash": "f439f336479836d65ca2a84bf666477b"
+  },
+  "queries/metrics/average_order_value.sql": {
+    "mtime": 1786040548.091679,
+    "ast_hash": "23b3ea7dca934d6bb594ee696b5549dd",
+    "semantic_hash": "23b3ea7dca934d6bb594ee696b5549dd"
+  },
+  "queries/metrics/emea_revenue_share.sql": {
+    "mtime": 1786040551.712219,
+    "ast_hash": "03f75adfdbc3a8aa176580a59ac68fa9",
+    "semantic_hash": "03f75adfdbc3a8aa176580a59ac68fa9"
+  },
+  "queries/metrics/order_count.sql": {
+    "mtime": 1786040545.2808316,
+    "ast_hash": "e5f22e057e4c7ec4478e562d8a49aa40",
+    "semantic_hash": "e5f22e057e4c7ec4478e562d8a49aa40"
+  },
+  "queries/metrics/revenue.sql": {
+    "mtime": 1786040542.474053,
+    "ast_hash": "67f2299299617ad11ad930e8c588130f",
+    "semantic_hash": "67f2299299617ad11ad930e8c588130f"
+  },
+  "queries/metrics/revenue_growth_mom.sql": {
+    "mtime": 1786040555.2700713,
+    "ast_hash": "9f55bda385f602fb0ed33ef93ec8a4ff",
+    "semantic_hash": "9f55bda385f602fb0ed33ef93ec8a4ff"
+  },
+  "queries/metrics/revenue_mtd.sql": {
+    "mtime": 1786040562.3324597,
+    "ast_hash": "fd895f5f1880ddd1ae52e32fe0905191",
+    "semantic_hash": "fd895f5f1880ddd1ae52e32fe0905191"
+  },
+  "queries/metrics/revenue_trailing_28d.sql": {
+    "mtime": 1786040558.789723,
+    "ast_hash": "e492e4222fcde5d87c5365f42178a04f",
+    "semantic_hash": "e492e4222fcde5d87c5365f42178a04f"
+  },
+  "queries/saved/weekly_revenue_by_region.sql": {
+    "mtime": 1786040565.1257775,
+    "ast_hash": "15369b614eb2791d6263280680704337",
+    "semantic_hash": "15369b614eb2791d6263280680704337"
+  },
+  "scripts/sync-dbt.sh": {
+    "mtime": 1786037559.3085263,
+    "ast_hash": "f3728cba8625d9a5e6f4203325bc49f8",
+    "semantic_hash": "f3728cba8625d9a5e6f4203325bc49f8"
+  },
+  "sources/dbt_semantic/customers.sql": {
+    "mtime": 1786037545.8318713,
+    "ast_hash": "b50263151ba8a10ab1a818c52e1a9872",
+    "semantic_hash": "b50263151ba8a10ab1a818c52e1a9872"
+  },
+  "sources/dbt_semantic/orders.sql": {
+    "mtime": 1786037544.3307774,
+    "ast_hash": "0936124426cfcf89297020a2c9def1b9",
+    "semantic_hash": "0936124426cfcf89297020a2c9def1b9"
+  },
+  "sources/dbt_semantic/time_spine.sql": {
+    "mtime": 1786037548.0144165,
+    "ast_hash": "15a188d187c9feb8061b49128c27b34d",
+    "semantic_hash": "15a188d187c9feb8061b49128c27b34d"
+  },
+  "sources/needful_things/orders.sql": {
+    "mtime": 1770395163.0,
+    "ast_hash": "f719f214f8fc6cf36107ac0f6d5e61e0",
+    "semantic_hash": "f719f214f8fc6cf36107ac0f6d5e61e0"
+  },
+  ".claude/skills/evidence-bi/SKILL.md": {
+    "mtime": 1786035927.202538,
+    "ast_hash": "17b34c1142707825f8ce87c6497f04f7",
+    "semantic_hash": "17b34c1142707825f8ce87c6497f04f7"
+  },
+  ".claude/skills/evidence-bi/references/components.md": {
+    "mtime": 1786059665.960582,
+    "ast_hash": "8deb6aec39a497f3921d38fe0904084d",
+    "semantic_hash": ""
+  },
+  ".claude/skills/evidence-bi/references/dbt-semantic-layer.md": {
+    "mtime": 1786052647.052729,
+    "ast_hash": "5e597ac0b49e6992fd424be495414586",
+    "semantic_hash": ""
+  },
+  ".claude/skills/evidence-bi/references/design-principles.md": {
+    "mtime": 1786035983.5996017,
+    "ast_hash": "2a02364b3298a05603639b05b38af1f3",
+    "semantic_hash": "2a02364b3298a05603639b05b38af1f3"
+  },
+  "README.md": {
+    "mtime": 1786059676.7519772,
+    "ast_hash": "a25d19dcd1ec2267f01bc306a7e82e3b",
+    "semantic_hash": ""
+  },
+  "evidence.config.yaml": {
+    "mtime": 1786041019.8478687,
+    "ast_hash": "54c5bda517adb139f49b1139cd68404f",
+    "semantic_hash": "54c5bda517adb139f49b1139cd68404f"
+  },
+  "pages/index.md": {
+    "mtime": 1786059519.1106606,
+    "ast_hash": "1f5e709b120aacceec2a778438385190",
+    "semantic_hash": ""
+  },
+  "pages/metrics.md": {
+    "mtime": 1786059527.1834307,
+    "ast_hash": "7abc167c99118da345187a0129825b0f",
+    "semantic_hash": ""
+  },
+  "pages/regions/[region].md": {
+    "mtime": 1786059290.2149456,
+    "ast_hash": "4b3926ffbc58dd46cff7f60289cad75b",
+    "semantic_hash": ""
+  },
+  "pages/regions/index.md": {
+    "mtime": 1786041203.6552186,
+    "ast_hash": "344aa89b848dd85fcc611887db1605f1",
+    "semantic_hash": "344aa89b848dd85fcc611887db1605f1"
+  },
+  "sources/dbt_semantic/connection.yaml": {
+    "mtime": 1786037540.869988,
+    "ast_hash": "1ea6988d2fa2715ae5ba7ec45812388f",
+    "semantic_hash": "1ea6988d2fa2715ae5ba7ec45812388f"
+  },
+  "queries/metrics/revenue_by_dimensions.sql": {
+    "mtime": 1786058830.6450937,
+    "ast_hash": "c9e4516e1238faaae0f23ec075ed9cdb",
+    "semantic_hash": ""
+  },
+  "scripts/graphify-lineage.py": {
+    "mtime": 1786049208.7778685,
+    "ast_hash": "0ef8aae6a54044a5ca3a7e0d9a9e11c0",
+    "semantic_hash": ""
+  },
+  "scripts/sync-evidence-upstream.sh": {
+    "mtime": 1786054167.6458127,
+    "ast_hash": "2c8e5bddb95cbb352cd8edaad7d6915e",
+    "semantic_hash": ""
+  },
+  ".claude/scratchpad.txt": {
+    "mtime": 1786053137.8789062,
+    "ast_hash": "78861f73dd2345b27a791b70d6c0e5ce",
+    "semantic_hash": ""
+  },
+  "pages/showcase.md": {
+    "mtime": 1786059360.198687,
+    "ast_hash": "ba77f12edad8d5f06b02cd7f876a1653",
+    "semantic_hash": ""
+  },
+  "sources/needful_things/connection.yaml": {
+    "mtime": 1770395163.0,
+    "ast_hash": "9511f604920a2735feaecf55f5173bd1",
+    "semantic_hash": ""
+  }
+}
