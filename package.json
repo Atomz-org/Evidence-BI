@@ -23,7 +23,10 @@
     "adbc:drivers": "for d in duckdb postgresql clickhouse snowflake bigquery; do npx --yes @columnar-tech/dbc install $d; done",
     "bench:layout": "node tests/bench-layout.mjs",
     "bench:openzl": "node tests/bench-openzl.mjs",
-    "test:gallery": "node tests/t-gallery-ui.mjs"
+    "test:gallery": "node tests/t-gallery-ui.mjs",
+    "test:livequery": "node tests/t-livequery-ui.mjs",
+    "test:screen": "node tests/t-screen.mjs",
+    "test:notebook:ui": "node tests/t-notebook-ui.mjs"
   },
   "engines": {
     "npm": ">=7.0.0",
