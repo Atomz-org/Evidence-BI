@@ -48,15 +48,19 @@ Four input types, one row, applied top-down. Nothing on this page is filtered
 anywhere else.
 
 ```sql date_bounds
-select min(metric_time) as start_date, max(metric_time) as end_date
-from ${metrics_revenue}
+-- Both ends in ONE column — DateRange runs min()/max() over the column named by
+-- dates=, so min and max in separate columns leaves it a single value to work
+-- from and every relative default anchors to the start of the data.
+select min(metric_time) as metric_time from ${metrics_revenue}
+union all
+select max(metric_time) from ${metrics_revenue}
 ```
 
 ```sql region_list
 select distinct region from ${metrics_revenue} order by region
 ```
 
-<DateRange name=date_range data={date_bounds} dates=start_date defaultValue="Last 30 Days"/>
+<DateRange name=date_range data={date_bounds} dates=metric_time defaultValue="Last 30 Days"/>
 <Dropdown name=region data={region_list} value=region multiple=true selectAllByDefault=true title="Region"/>
 <ButtonGroup name=grain title="Grain">
   <ButtonGroupItem valueLabel="Day" value="day"/>
