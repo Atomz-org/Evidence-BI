@@ -18,6 +18,12 @@ sources/dbt_semantic/*.sql                extract marts (orders, customers, time
 queries/metrics/<metric>.sql              the COMPILED semantic layer — one file per dbt metric
 queries/saved/<name>.sql                  compiled dbt saved_queries
 pages/*.md                                dashboards: filter + aggregate + render only
+
+rill/metrics/*.yaml                       a Rill metrics view over the same marts
+rill/explores/*.yaml                      which of its fields are on which dashboard
+        │  scripts/build-rill-model.mjs
+        ▼
+components/rill/model.generated.js        the same definitions, compiled for the browser
 ```
 
 Pages never restate business logic. If a dashboard needs a number that doesn't
@@ -48,6 +54,12 @@ To rebuild the dbt project first: `REBUILD=1 ./scripts/sync-dbt.sh`
   concentration, chip-based cross-filtering with no SQL, a table with in-cell
   bars, deltas, colour scales and sparklines, and the governance trail from
   dbt YAML → compiled SQL → page.
+- **`/rill` Explore (Rill)** — a Rill metrics view and explore dashboard,
+  defined in `rill/` in Rill's own YAML schema and rendered here without a Rill
+  server: a data-anchored time range with the window before it, measure cards
+  carrying their change, ranked dimension leaderboards that cross-filter, and
+  expand-by-dimension. Below it, the same metrics view driving a noodle
+  worksheet.
 - **`/reports/revenue-performance` Order Revenue Performance** — every exhibit opens:
   see [Live SQL](#live-sql--every-exhibit-opens). Otherwise the same figures as
   a management report rather than a dashboard: control block (report ID, period,
@@ -187,6 +199,76 @@ Stating one method twice is a liability unless something checks the two still
 agree, which is what `npm run test:screen` is for: it runs the SQL and an
 independent transcription of the notebook's pandas over the project's real
 parquet and requires them to match on every row, at every window the page offers.
+
+## Rill — the dashboard as a file
+
+[Rill](https://github.com/rilldata/rill)'s idea is that a dashboard is a file: a
+metrics view declares dimensions and measures, an explore declares which of them
+are on the board, and the tool renders exactly that. `rill/` is a real Rill
+project in Rill's schema — `rill start rill/` renders it — and `/rill` renders
+the same YAML with no Rill process running.
+
+```
+rill/models/orders_enriched.sql     read_parquet(...) — resolved two ways
+rill/metrics/orders_metrics.yaml    7 measures, 4 dimensions, one timeseries
+rill/explores/revenue.yaml          the board, its ranges, what it opens on
+```
+
+The model's `read_parquet('data/<source>/<table>/<table>.parquet')` calls are
+what make one file serve both: Rill resolves them against `./data`, and
+`scripts/build-rill-model.mjs` rewrites them to the tables Evidence has already
+registered in duckdb-wasm. The join grain and column list cannot differ between
+the two renderings, because there is only one of them.
+
+**Three things it brings that nothing else here did.**
+
+*A window and the window before it.* Every measure is shown with its change,
+anchored to the newest row in the data rather than to the clock — this project's
+parquet ends 4 August 2026, and a "last 7 days" measured from today would open
+on an empty chart. Where the prior window runs off the start of the data the
+page says how much of it is real, rather than letting a 64%-full period read as
+growth.
+
+*Leaderboards that cross-filter.* Clicking a value filters every panel; the board
+you clicked keeps its other values, so you can add a second without clearing the
+first blind. `−` excludes instead.
+
+*Expand by dimension.* One measure, split into a line per dimension value — where
+"revenue is up" becomes "revenue is up in one region".
+
+**What the generator enforces.** Rill's loader checks the YAML; it cannot check
+whether a measure claiming `valid_percent_of_total` can actually be summed across
+a partition, and that claim is what draws a "% of total" column. A distinct count
+cannot (one customer, two regions) and neither can a ratio (the average of
+averages is not the average). The generator refuses to compile either, so the
+leaderboards show a share only where a share means something — and say so in the
+footer where they don't.
+
+**Governed measures reach the worksheet.** A catalog field may now carry
+`aggExpression`, an aggregate the semantic layer owns, and the noodle compiler
+emits it verbatim. Dragging *Average order value* onto a shelf produces
+`sum(order_amount_usd) / nullif(count(*), 0)` — the metrics view's expression,
+not a re-derivation of it. The aggregation menu is closed for those fields and
+says why, for Cube's measures as well as Rill's, and a level-of-detail
+expression over one is refused rather than silently returning an average of
+averages.
+
+```svelte
+<RillExplore explore="revenue"/>
+<Noodle rill={{ explore: 'revenue' }}/>
+```
+
+**Where it stops.** `security:` (row-level policies) parses and does nothing —
+a static site has no user to enforce against, and a filter applied in the browser
+is not a security control. Pivot mode, dimension-vs-dimension comparison, alerts,
+scheduled reports and themes are Rill-only. `rill/README.md` has the full list.
+
+**Why the panels don't open.** Every panel shows the SQL it ran and none of them
+let you edit it, which is the opposite of the rule one section above. A report is
+an argument and a reader should be able to check it; a governed measure's whole
+value is meaning one thing everywhere. So it is inspectable everywhere and
+editable nowhere, and the escape hatch under the board hands the same window to
+LiveQuery where an edit is plainly the reader's own.
 
 ## Studio — dashboards and reports, built at runtime
 
@@ -356,11 +438,15 @@ npm run notebooks      # re-apply the native-notebook core patch (also runs on p
 ./cube/up.sh           # local Cube over this project's parquet (./cube/up.sh down to stop)
 npm run cube:up        # same, via docker compose where a Docker daemon is available
 
+npm run rill:model     # compile rill/ -> components/rill/model.generated.js (also on postinstall)
+./rill/up.sh           # the real Rill over the same parquet, at localhost:9009
+
 npm run test:noodle    # 37 assertions: spec -> SQL, LOD, table calcs, Show Me
 npm run test:dashboard # 29 assertions: filter composition, save/open, published SQL
 npm run test:notebook  # 44 assertions: serializer escaping + notebook compiler
 npm run test:cube      # 34 assertions + every generated SQL executed on Cube (needs cube/up.sh)
 npm run test:screen    # 12 assertions: the notebook's anomaly screen, in SQL and in pandas, agree
+npm run test:rill      # 33 assertions: every Rill measure vs an independent control, 5 timezones
 
 # Browser suites — need a server for the built site:
 #   npm run build && node tests/static-server.mjs build 4321
@@ -368,6 +454,7 @@ npm run test:studio    # 26 assertions: cross-filter moves the other views, publ
 npm run test:gallery   # 10 assertions: every component on /gallery actually rendered
 npm run test:livequery # 20 checks: edit an exhibit's SQL, it redraws; writes refused; Reset restores
 npm run test:notebook:ui # 12 checks: the notebook's window/threshold controls recompute the screen
+npm run test:rill:ui   # 30 checks: cross-filter, comparison toggle, share withdrawn for a ratio
 ```
 
 The tests are execution-based rather than snapshot-based: generated SQL is run

@@ -1,0 +1,13 @@
+# A Rill project over this repo's own parquet.
+#
+# `rill start` reads this directory directly. Evidence reads the same files
+# through scripts/build-rill-model.mjs, which compiles the YAML below into a
+# module the browser can use. Neither side owns the definitions — this does.
+compiler: rillv1
+
+display_name: Evidence BI — governed metrics
+description: >
+  The dbt semantic mart, expressed as a Rill metrics view so that a measure has
+  one definition whichever surface asks for it.
+
+olap_connector: duckdb

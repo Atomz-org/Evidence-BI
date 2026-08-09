@@ -129,6 +129,31 @@ export const compile = (catalog, spec) => {
 		return alias;
 	};
 
+	/**
+	 * A field may arrive carrying its own aggregate rather than a column to
+	 * aggregate — a Rill metrics view's `expression`, copied verbatim, so that
+	 * `avg_order_value` on a worksheet is the same SQL as `avg_order_value` on
+	 * the governed dashboard instead of a re-derivation of it.
+	 *
+	 * Its inputs have to reach `base` under their own names, because the
+	 * expression names them, and they have to claim those names *first*. A binned
+	 * or date-truncated dimension on the same column takes the identity alias
+	 * otherwise, and the governed measure then aggregates the bucketed value
+	 * while still reporting the governed label — wrong, and invisibly so.
+	 */
+	const governedInputs = new Set();
+	const carryGoverned = (fieldId) => {
+		const field = catalog.byId[fieldId];
+		if (!field?.aggExpression || governedInputs.has(field.id) || !reachable.has(field.table)) return;
+		governedInputs.add(field.id);
+		for (const column of field.requires ?? []) {
+			if (takenAliases.has(column)) continue;
+			takenAliases.add(column);
+			baseSelects.push(`${columnRef(field.table, column)} as ${ident(column)}`);
+		}
+	};
+	for (const pill of pills) if (pill.role === 'measure') carryGoverned(pill.fieldId);
+
 	const viewDimPills = dimensionPills(spec).filter(usable);
 	for (const pill of viewDimPills) registerDim(pill);
 
@@ -159,6 +184,9 @@ export const compile = (catalog, spec) => {
 	const carryMeasure = (fieldId) => {
 		const field = catalog.byId[fieldId];
 		if (!field || measureColumns.has(field.id) || !reachable.has(field.table)) return;
+		// A governed measure has no single column to carry; its inputs are already
+		// in `base` from the pass above.
+		if (field.aggExpression) return;
 		const alias = uniqueAlias(`m_${field.column}`, takenAliases);
 		measureColumns.set(field.id, alias);
 		baseSelects.push(`${columnRef(field.table, field.column)} as ${ident(alias)}`);
@@ -283,17 +311,33 @@ export const compile = (catalog, spec) => {
 		const field = catalog.byId[pill.fieldId];
 
 		const alias = uniqueAlias(
-			pill.lod ? `${pill.lod.kind.toLowerCase()}_${field?.column ?? 'value'}` : `${pill.agg ?? 'sum'}_${field?.column ?? 'value'}`,
+			pill.lod
+				? `${pill.lod.kind.toLowerCase()}_${field?.column ?? 'value'}`
+				: field?.aggExpression
+					? (field.column ?? 'value')
+					: `${pill.agg ?? 'sum'}_${field?.column ?? 'value'}`,
 			new Set([...takenAliases, ...measureAliases])
 		);
+
+		if (pill.lod && field?.aggExpression) {
+			// An LOD recomputes a measure at another grain, which means taking it
+			// apart. A governed expression is exactly the thing that must not be
+			// taken apart — re-aggregating `sum(x)/count(*)` at an outer grain is
+			// an average of averages wearing the metrics view's label.
+			warnings.push(
+				`${field.name} is defined by the semantic layer, so it cannot be recomputed at another level of detail.`
+			);
+			continue;
+		}
 
 		if (pill.lod) {
 			const lodView = lodViews.find((v) => v.pill.key === pill.key);
 			if (!lodView) continue;
 			finalSelects.push(`${lodView.cte}.${ident(lodView.valueAlias)} as ${ident(alias)}`);
 		} else {
-			const expr =
-				pill.agg === 'count'
+			const expr = field?.aggExpression
+				? field.aggExpression
+				: pill.agg === 'count'
 					? 'count(*)'
 					: (() => {
 							const measureAlias = measureColumns.get(field?.id);
@@ -323,6 +367,14 @@ export const compile = (catalog, spec) => {
 	const havingClauses = [];
 	for (const filter of spec.filters) {
 		if (filter.role !== 'measure') continue;
+		const governedField = catalog.byId[filter.fieldId];
+		if (governedField?.aggExpression) {
+			// The expression is already an aggregate, so it belongs in HAVING as
+			// written rather than wrapped in a second one.
+			const clause = filterSql(governedField.aggExpression, filter);
+			if (clause) havingClauses.push(clause);
+			continue;
+		}
 		const measureAlias = measureColumns.get(filter.fieldId);
 		if (!measureAlias) continue;
 		const clause = filterSql(aggregateExpr(ident(measureAlias), filter.agg ?? 'sum'), filter);

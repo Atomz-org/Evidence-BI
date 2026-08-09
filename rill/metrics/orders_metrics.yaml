@@ -1,0 +1,93 @@
+# The governed definition of every number this project reports on orders.
+#
+# Read by `rill start` as a metrics view, and by scripts/build-rill-model.mjs so
+# the same measures drive the Evidence pages. Change a measure here and both
+# move; there is nowhere else to change it.
+version: "1"
+type: metrics_view
+
+display_name: Orders
+description: >
+  One row per order from the dbt semantic mart, with the customer's country
+  joined on. Revenue is gross unless the measure says otherwise.
+
+model: orders_enriched
+timeseries: ordered_at
+smallest_time_grain: day
+
+dimensions:
+  - name: region
+    display_name: Region
+    column: region
+    description: >
+      Denormalized onto the order via the customer entity. Orders with no
+      customer record are bucketed as "Guest checkout" upstream, in
+      sources/dbt_semantic/orders.sql, so the buckets are exhaustive.
+
+  - name: order_status
+    display_name: Order status
+    column: order_status
+    description: Lifecycle state at extract time, not at order time.
+
+  - name: country_code
+    display_name: Country
+    column: country_code
+
+  - name: order_size
+    display_name: Order size
+    description: Value bands, so a leaderboard can show mix without a measure.
+    expression: >
+      case when order_amount_usd >= 500 then 'Large (500+)'
+           when order_amount_usd >= 100 then 'Medium (100-499)'
+           else 'Small (under 100)' end
+
+measures:
+  # `valid_percent_of_total` is the honest part of this file. Rill will render a
+  # "% of total" column for a measure that claims it, and the claim is only true
+  # for measures that actually sum across a partition. Revenue and counts do.
+  # A distinct count does not — the same customer appears in two regions and the
+  # parts exceed the whole. A ratio does not either: the average of averages is
+  # not the average. Those three say nothing, so nothing is offered.
+  - name: revenue
+    display_name: Revenue
+    description: Gross order value in USD. Includes cancelled orders — filter, or use net revenue.
+    expression: sum(order_amount_usd)
+    format_preset: currency_usd
+    valid_percent_of_total: true
+
+  - name: net_revenue
+    display_name: Net revenue
+    description: Line-level amount after discounts, summed to the order.
+    expression: sum(net_line_amount_usd)
+    format_preset: currency_usd
+    valid_percent_of_total: true
+
+  - name: orders
+    display_name: Orders
+    expression: count(*)
+    format_preset: humanize
+    valid_percent_of_total: true
+
+  - name: line_items
+    display_name: Line items
+    expression: sum(line_item_count)
+    format_preset: humanize
+    valid_percent_of_total: true
+
+  - name: customers
+    display_name: Customers
+    description: Distinct customers who ordered in the window. Does not add up across slices.
+    expression: count(distinct customer_id)
+    format_preset: humanize
+
+  - name: avg_order_value
+    display_name: Average order value
+    expression: sum(order_amount_usd) / nullif(count(*), 0)
+    format_preset: currency_usd
+
+  - name: cancellation_rate
+    display_name: Cancellation rate
+    description: Share of orders in the window whose current status is cancelled.
+    expression: count(*) filter (where order_status = 'cancelled') / nullif(count(*)::double, 0)
+    format_preset: percentage
+    lower_is_better: true

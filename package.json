@@ -2,7 +2,7 @@
   "name": "my-evidence-project",
   "version": "0.0.1",
   "scripts": {
-    "postinstall": "node scripts/apply-notebook-core.mjs",
+    "postinstall": "node scripts/apply-notebook-core.mjs && node scripts/build-rill-model.mjs",
     "notebooks": "node scripts/apply-notebook-core.mjs",
     "build": "evidence build",
     "build:strict": "evidence build:strict",
@@ -26,7 +26,11 @@
     "test:gallery": "node tests/t-gallery-ui.mjs",
     "test:livequery": "node tests/t-livequery-ui.mjs",
     "test:screen": "node tests/t-screen.mjs",
-    "test:notebook:ui": "node tests/t-notebook-ui.mjs"
+    "test:notebook:ui": "node tests/t-notebook-ui.mjs",
+    "rill:model": "node scripts/build-rill-model.mjs",
+    "rill:up": "./rill/up.sh",
+    "test:rill": "node tests/t-rill.mjs",
+    "test:rill:ui": "node tests/t-rill-ui.mjs"
   },
   "engines": {
     "npm": ">=7.0.0",

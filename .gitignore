@@ -24,3 +24,6 @@ graphify-out/.graphify_*
 
 # scratch datasets written by tests/bench-openzl.mjs — hundreds of MB, regenerable
 .bench/
+
+# rill/up.sh stages the Evidence parquet here so read_parquet() resolves
+/rill/data

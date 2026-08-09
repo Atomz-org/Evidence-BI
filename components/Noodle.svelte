@@ -38,6 +38,12 @@
 	import { AGGREGATIONS, DATE_PARTS } from './noodle/engine/sql.js';
 	import { createSequencer, hasView, runSpec } from './noodle/engine/runner.js';
 	import { catalogFromCubeMeta, createCubeClient, toCubeSql } from './noodle/engine/cube.js';
+	import { RILL } from './rill/model.generated.js';
+	import {
+		catalogFromMetricsView,
+		createViewSql,
+		viewName as rillViewName
+	} from './rill/engine/metrics.js';
 
 	/** Fully qualified tables to expose. */
 	export let tables = [];
@@ -49,6 +55,16 @@
 	export let labels = {};
 	/** Height of the chart canvas. */
 	export let height = 420;
+	/**
+	 * Height of the field list once the surface stacks into one column.
+	 *
+	 * Fixed rather than proportional because in the stacked layout the field list
+	 * sits *above* the shelves, and a list that grows with the catalog pushes the
+	 * thing you are dragging onto off the screen. The default suits a handful of
+	 * columns; a semantic layer with a dozen governed measures wants more, or half
+	 * its fields are below a fold nobody thinks to scroll.
+	 */
+	export let fieldListHeight = 200;
 	/** Start with these fields on shelves: { columns: [...], rows: [...] }. */
 	export let initial = null;
 	/**
@@ -61,6 +77,19 @@
 	 * everything behaves exactly as before.
 	 */
 	export let cube = null;
+	/**
+	 * Use a Rill metrics view as the semantic layer: `{ explore }` or
+	 * `{ metricsView }`, naming a resource in `rill/`.
+	 *
+	 * Unlike the Cube path this still compiles to SQL and still runs in
+	 * duckdb-wasm — what changes is where the field list comes from. Measures
+	 * arrive carrying the expression the metrics view declares, so dragging
+	 * "Average order value" onto a shelf produces the governed ratio rather than
+	 * an average of a column that happens to be named like one. The aggregation
+	 * menu is closed for those fields, because the semantic layer has already
+	 * answered that question.
+	 */
+	export let rill = null;
 	/**
 	 * The view specification.
 	 *
@@ -94,6 +123,23 @@
 
 	let cubeClient = null;
 	let cubeSql = null;
+	let rillView = null;
+
+	/**
+	 * `{ explore }` names a dashboard and inherits its metrics view; `{ metricsView }`
+	 * names the view directly, for a worksheet that is not tied to a dashboard.
+	 */
+	const resolveRillView = (config) => {
+		const name = config.metricsView ?? RILL.explores[config.explore]?.metricsView;
+		const view = name ? RILL.metricsViews[name] : null;
+		if (!view) {
+			throw new Error(
+				`No Rill metrics view for ${JSON.stringify(config)} — ` +
+					`known views: ${Object.keys(RILL.metricsViews).join(', ') || 'none'}`
+			);
+		}
+		return view;
+	};
 
 	let search = '';
 	let dragging = null;
@@ -128,20 +174,33 @@
 			// which columns are measures or how they aggregate.
 			if (cube) cubeClient = createCubeClient(cube);
 
+			// A Rill metrics view resolves to one DuckDB relation, created here so a
+			// worksheet and the governed dashboard are reading the same thing rather
+			// than two copies of the same intent.
+			if (rill) {
+				rillView = resolveRillView(rill);
+				await query(createViewSql(rillView, RILL.models));
+			}
+
 			// A catalog handed in by a parent is already built; introspecting again
 			// would be the same work per tile and could disagree with itself.
 			if (!catalog) {
 				catalog = cube
 					? catalogFromCubeMeta(await cubeClient.meta(), { viewsOnly: cube.viewsOnly })
-					: await buildCatalog(query, { tables, relationships, fields, labels });
-				if (!cube) await loadCardinality(query);
+					: rillView
+						? catalogFromMetricsView(rillView, RILL.models)
+						: await buildCatalog(query, { tables, relationships, fields, labels });
+				// Cardinality is introspection over raw columns; a metrics view's
+				// measures are expressions with no column to count, so Show Me falls
+				// back to its shape rules there, as it does for Cube.
+				if (!cube && !rill) await loadCardinality(query);
 			}
 
 			// A spec arriving as a prop is somebody's saved view. Only seed a fresh
 			// one when the shelves are genuinely empty, or opening a tile in the
 			// editor would clear the tile.
 			if (!allPills({ ...emptySpec(), ...(spec ?? {}) }).length) {
-				spec = { ...emptySpec(cube ? null : (tables[0] ?? null)) };
+				spec = { ...emptySpec(cube ? null : rillView ? rillViewName(rillView) : (tables[0] ?? null)) };
 				if (initial) applyInitial();
 			}
 		} catch (e) {
@@ -436,7 +495,7 @@
 </script>
 
 <div class="noodle-outer">
-<div class="noodle" class:dark={mode === 'dark'}>
+<div class="noodle" class:dark={mode === 'dark'} style="--nd-fields-stacked: {fieldListHeight}px">
 	<!-- ------------------------------------------------------- data panel -- -->
 	<aside class="panel data-panel">
 		<div class="panel-head">
@@ -522,16 +581,29 @@
 								<button class="pill-x" on:click={() => (spec = removePill(spec, pill.key))} aria-label="Remove">×</button>
 
 								{#if openPill === pill.key}
+									{@const pillField = catalog?.byId[pill.fieldId]}
 									<div class="menu" role="menu">
 										{#if pill.role === 'measure'}
 											<div class="menu-head">Aggregate</div>
-											{#each Object.entries(AGGREGATIONS) as [key, agg]}
-												<button
-													class="menu-item"
-													class:active={pill.agg === key}
-													on:click={() => (spec = updatePill(spec, pill.key, { agg: key }))}
-												>{agg.label}</button>
-											{/each}
+											{#if pillField?.semantic}
+												<!--
+													A modelled measure's aggregation is not the shelf's to choose.
+													Offering the menu and then ignoring the choice is worse than not
+													offering it: the compiler's warning arrives after the fact, and
+													until it does the pill reads as though the setting took.
+												-->
+												<p class="menu-note">
+													{pillField.aggLocked ?? 'Decided by the semantic layer, not by this shelf.'}
+												</p>
+											{:else}
+												{#each Object.entries(AGGREGATIONS) as [key, agg]}
+													<button
+														class="menu-item"
+														class:active={pill.agg === key}
+														on:click={() => (spec = updatePill(spec, pill.key, { agg: key }))}
+													>{agg.label}</button>
+												{/each}
+											{/if}
 
 											<div class="menu-head">Table calculation</div>
 											<button
@@ -860,6 +932,10 @@
 		font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
 		color: var(--nd-muted); padding: 6px 8px 2px;
 	}
+	.menu-note {
+		margin: 0; padding: 2px 8px 6px; font-size: 11px; line-height: 1.45;
+		color: var(--nd-muted); max-width: 22rem;
+	}
 	.menu-item, .menu-close {
 		display: block; width: 100%; text-align: left; background: none; border: 0;
 		padding: 5px 8px; border-radius: 4px; cursor: pointer; color: inherit; font: inherit; font-size: 12px;
@@ -947,7 +1023,7 @@
 	@container (max-width: 1040px) {
 		.noodle { grid-template-columns: 1fr; }
 		.data-panel, .side { border-left: 0; border-right: 0; border-bottom: 1px solid var(--nd-border); }
-		.scroll { max-height: 200px; }
+		.scroll { max-height: var(--nd-fields-stacked, 200px); }
 		.marks { grid-template-columns: repeat(4, 1fr); }
 	}
 
@@ -956,7 +1032,7 @@
 		@media (max-width: 1100px) {
 			.noodle { grid-template-columns: 1fr; }
 			.data-panel, .side { border-left: 0; border-right: 0; border-bottom: 1px solid var(--nd-border); }
-			.scroll { max-height: 200px; }
+			.scroll { max-height: var(--nd-fields-stacked, 200px); }
 		}
 	}
 </style>
