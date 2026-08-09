@@ -16,10 +16,81 @@ disabled for modelled measures and says why.
 That is the whole point of a semantic layer: the exploration surface stops being
 a place where definitions are invented.
 
-<Noodle
+One board, four views, every one of them editable. Press **Edit** on a tile and
+the full shelf surface opens over the canvas — the same Show Me, the same marks,
+the same level-of-detail expressions as [/noodle](/noodle), except the catalog is
+Cube's model rather than the warehouse. Click a mark to cross-filter the rest of
+the board; **Publish as code** turns the whole thing into an Evidence page whose
+numbers still resolve through the model.
+
+The four starting views each show something the model contributes that the
+parquet surface cannot: a measure that carries its own aggregation, a modelled
+dimension, a derived measure with no column behind it, and a join nothing on the
+page had to declare.
+
+<Studio
     cube={{ apiUrl: 'http://localhost:4000' }}
-    initial={{ columns: ['orders.ordered_at'], rows: ['orders.revenue'] }}
-    height={400}
+    storageKey="noodle.studio.cube.v1"
+    starter={{
+        version: 1,
+        title: 'Governed exploration',
+        subtitle: 'Four views on the Cube model — press Edit on any tile to open its worksheet',
+        mode: 'dashboard',
+        filters: [],
+        tiles: [
+            {
+                id: 'tile_1',
+                title: 'Revenue over time',
+                w: 6, h: 260,
+                spec: {
+                    source: { primary: null, joins: [] },
+                    columns: [{ key: 'c1', fieldId: 'orders.ordered_at', role: 'dimension', agg: null, datePart: 'month', bin: null, sort: null, calc: null, lod: null, format: null }],
+                    rows: [{ key: 'c2', fieldId: 'orders.revenue', role: 'measure', agg: null, datePart: null, bin: null, sort: null, calc: null, lod: null, format: null }],
+                    color: null, size: null, label: null, detail: [], tooltip: [], filters: [],
+                    mark: 'line', stacked: true, limit: 5000
+                }
+            },
+            {
+                id: 'tile_2',
+                title: 'Revenue by region',
+                w: 6, h: 260,
+                spec: {
+                    source: { primary: null, joins: [] },
+                    columns: [{ key: 'c3', fieldId: 'orders.region', role: 'dimension', agg: null, datePart: null, bin: null, sort: null, calc: null, lod: null, format: null }],
+                    rows: [{ key: 'c4', fieldId: 'orders.revenue', role: 'measure', agg: null, datePart: null, bin: null, sort: null, calc: null, lod: null, format: null }],
+                    color: null, size: null, label: null, detail: [], tooltip: [], filters: [],
+                    mark: 'bar', stacked: true, limit: 5000
+                }
+            },
+            {
+                id: 'tile_3',
+                title: 'Average order value by region',
+                w: 6, h: 260,
+                spec: {
+                    source: { primary: null, joins: [] },
+                    columns: [{ key: 'c5', fieldId: 'orders.region', role: 'dimension', agg: null, datePart: null, bin: null, sort: null, calc: null, lod: null, format: null }],
+                    rows: [{ key: 'c6', fieldId: 'orders.avg_order_value', role: 'measure', agg: null, datePart: null, bin: null, sort: null, calc: null, lod: null, format: null }],
+                    color: null, size: null, label: null, detail: [], tooltip: [], filters: [],
+                    mark: 'bar', stacked: true, limit: 5000
+                }
+            },
+            {
+                id: 'tile_4',
+                title: 'Revenue by country — a join from the model',
+                w: 6, h: 260,
+                spec: {
+                    source: { primary: null, joins: [] },
+                    columns: [{ key: 'c7', fieldId: 'customers.country_code', role: 'dimension', agg: null, datePart: null, bin: null, sort: null, calc: null, lod: null, format: null }],
+                    rows: [
+                        { key: 'c8', fieldId: 'orders.revenue', role: 'measure', agg: null, datePart: null, bin: null, sort: null, calc: null, lod: null, format: null },
+                        { key: 'c9', fieldId: 'orders.count', role: 'measure', agg: null, datePart: null, bin: null, sort: null, calc: null, lod: null, format: null }
+                    ],
+                    color: null, size: null, label: null, detail: [], tooltip: [], filters: [],
+                    mark: 'table', stacked: true, limit: 5000
+                }
+            }
+        ]
+    }}
 />
 
 <Alert status="info">

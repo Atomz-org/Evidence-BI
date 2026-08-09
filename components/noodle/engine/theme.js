@@ -74,6 +74,13 @@ export const reliefRequired = (mode, seriesCount) =>
  * Evidence's theme switcher toggles a class on the document element; reading the
  * computed background is more reliable than guessing from a media query, which
  * would be wrong whenever the user has overridden the system preference.
+ *
+ * The subtlety is transparency. `<html>` frequently has no background of its own
+ * — the colour is painted on `<body>` — and `getComputedStyle` reports that as
+ * `rgba(0, 0, 0, 0)`. Reading only the channels turns "not painted" into pure
+ * black, and every chart on a white page comes out dressed for a dark one. So the
+ * alpha decides whether an element has an opinion at all, and the search walks
+ * outward until something does.
  */
 export const detectMode = () => {
 	if (typeof document === 'undefined') return 'light';
@@ -81,12 +88,16 @@ export const detectMode = () => {
 	if (root.classList.contains('dark')) return 'dark';
 	if (root.dataset.theme === 'dark') return 'dark';
 
-	const bg = getComputedStyle(root).backgroundColor;
-	const match = bg.match(/\d+/g);
-	if (match?.length >= 3) {
-		const [r, g, b] = match.map(Number);
+	for (const element of [root, document.body]) {
+		if (!element) continue;
+		const match = getComputedStyle(element).backgroundColor.match(/[\d.]+/g);
+		if (!match || match.length < 3) continue;
+		const [r, g, b, a = 1] = match.map(Number);
+		if (Number(a) === 0) continue; // transparent: no opinion, keep looking
 		// Rec. 601 luma is good enough to tell a dark surface from a light one.
-		if (0.299 * r + 0.587 * g + 0.114 * b < 128) return 'dark';
+		return 0.299 * r + 0.587 * g + 0.114 * b < 128 ? 'dark' : 'light';
 	}
-	return 'light';
+
+	// Nothing on the page is painted yet — fall back to the system preference.
+	return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
