@@ -1,0 +1,60 @@
+cubes:
+  - name: orders
+    title: Orders
+    description: One row per order, from the dbt semantic mart.
+    sql: >
+      select * from read_parquet('/data/dbt_semantic/orders/orders.parquet')
+
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{CUBE}.customer_id = {customers}.customer_id"
+
+    dimensions:
+      - name: order_id
+        sql: order_id
+        type: string
+        primary_key: true
+        public: true
+      - name: region
+        sql: region
+        type: string
+      - name: order_status
+        sql: order_status
+        type: string
+      - name: ordered_at
+        sql: ordered_at
+        type: time
+
+    segments:
+      - name: not_cancelled
+        sql: "{CUBE}.order_status <> 'cancelled'"
+      - name: paid_only
+        sql: "{CUBE}.order_status = 'paid'"
+
+    measures:
+      - name: count
+        type: count
+        title: Orders
+      - name: revenue
+        sql: order_amount_usd
+        type: sum
+        title: Revenue
+        format: currency
+        description: >
+          Gross order revenue in USD. Excludes nothing by itself — pair with the
+          not_cancelled segment for the governed figure.
+      - name: net_revenue
+        sql: net_line_amount_usd
+        type: sum
+        title: Net Revenue
+        format: currency
+      - name: avg_order_value
+        sql: "{revenue} / nullif({count}, 0)"
+        type: number
+        title: Average Order Value
+        format: currency
+      - name: line_items
+        sql: line_item_count
+        type: sum
+        title: Line Items

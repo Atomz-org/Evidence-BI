@@ -3,6 +3,12 @@
 build
 node_modules
 .DS_Store
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+
+# installed by scripts/apply-notebook-core.mjs from the vendored core —
+# vendor/evidence/packages/evidence/notebook/python/evidence.py is the original
+/evidence.py
 static/data
 *.options.yaml
 .vscode/settings.json
@@ -15,3 +21,6 @@ sources/dbt_semantic/*.duckdb
 # graphify local state (machine-specific paths, caches, intermediates)
 graphify-out/cache/
 graphify-out/.graphify_*
+
+# scratch datasets written by tests/bench-openzl.mjs — hundreds of MB, regenerable
+.bench/

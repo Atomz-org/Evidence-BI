@@ -59,6 +59,204 @@ To rebuild the dbt project first: `REBUILD=1 ./scripts/sync-dbt.sh`
   trend, and a full order log for audit.
 - **`/metrics` Metric Dictionary** — every metric's definition, type, caveats,
   and a live value computed from the compiled query (drift shows up here first).
+- **`/noodle` Explore** — the drag-and-drop exploration workbench: shelves, Show
+  Me, level-of-detail expressions, table calculations, click-to-filter, and an
+  export back to Evidence markdown. See [noodle](#noodle--the-exploration-surface).
+- **`/studio` Studio** — build a whole dashboard or report at runtime: several
+  views on one canvas, slicers, cross-filtering by clicking a mark, save/export,
+  and *Publish as code* to turn it into an Evidence page. See
+  [Studio](#studio--dashboards-and-reports-built-at-runtime).
+- **`/gallery`** — the component set and the layout system, each shown working
+  on real data.
+- **`/notebooks/order-anomalies` Revenue Anomaly Detection** — authored as a
+  Jupyter notebook (`pages/notebooks/order-anomalies.ipynb`), not markdown. A
+  pandas screen over the governed `revenue` metric, on one page with SQL KPIs
+  from the semantic layer. See [Jupyter notebooks as pages](#jupyter-notebooks-as-pages).
+
+## noodle — the exploration surface
+
+`/noodle` is a drag-and-drop workbench built on this project's semantic layer.
+Fields go onto **shelves**; the shelves are the specification; the SQL *and* the
+chart are both derived from it. Changing the mark never touches the query, and
+changing the query never touches the mark.
+
+`<Noodle/>` is auto-imported like any component in [components/](components/):
+
+```svelte
+<Noodle
+    tables={['dbt_semantic.orders', 'dbt_semantic.customers']}
+    relationships={[{ from: 'dbt_semantic.orders', to: 'dbt_semantic.customers',
+                      on: [['customer_id', 'customer_id']], type: 'left' }]}
+/>
+```
+
+The engine is plain JavaScript with no framework in it, so it is testable
+without a browser — [components/noodle/engine/](components/noodle/engine/):
+
+| Module | Responsibility |
+|---|---|
+| `catalog.js` | introspects the warehouse; the relationship layer and join planning |
+| `spec.js` | the shelf algebra — pills, shelves, and the operations on them |
+| `compile.js` | specification → one SQL statement, including level-of-detail |
+| `tablecalc.js` | running total, moving average, percent of total, rank |
+| `showme.js` | ranks the marks that suit the fields, with the reason for each |
+| `encode.js` | the chart, on the validated palette, light and dark |
+| `export.js` | the view back out as Evidence markdown |
+
+**Granularity is the whole idea.** A view's grain is the dimensions on its
+shelves; measures aggregate up to it.
+
+**Level-of-detail expressions** compute at a *different* grain and come back:
+`FIXED` ignores the view's grain, `INCLUDE` adds to it, `EXCLUDE` subtracts.
+Each compiles to its own grouped CTE, is paired *distinctly* with the view's
+grain, then aggregated in — the distinct pairing is what stops the outer
+aggregate being silently weighted by underlying row counts, which is the
+difference between `AVG` meaning the mean of the inner results and meaning a
+row-weighted mean.
+
+**Table calculations** are computed over the result along a **field**, not along
+the screen. A calculation addressed to "across the table" changes meaning the
+moment Rows and Columns are swapped; addressed to a date it survives any layout.
+
+**The design system is enforced during exploration, not just in published
+pages.** Show Me picks by the job the data is doing and says why; the surface
+warns when a chart leans on the palette's low-contrast light-mode slots, and
+when series count exceeds what colour can carry.
+
+**Exploration ends in code.** *Copy as Evidence markdown* emits the `sql` block
+and the component, ready to paste into a page and be reviewed and versioned.
+Nothing built on `/noodle` is governed until it goes through that door — the page
+says so.
+
+### Not built yet
+
+The **relationship** layer (logical links) and the **physical** join it resolves
+to are live. **Data blending** — aggregating genuinely separate sources to a
+common grain and matching on shared dimensions, for warehouses that cannot be
+joined at all — is not, and neither is heterogeneous federation via an external
+service such as WrenAI. A field whose table has no declared path to the view's
+primary table is reported rather than silently cross-joined, so the gap is
+visible rather than wrong.
+
+## Studio — dashboards and reports, built at runtime
+
+`/studio` is the composition layer above noodle: several views on one canvas,
+sharing one filter context, saved, and published back to Evidence markdown.
+
+```svelte
+<Studio
+    tables={['dbt_semantic.orders', 'dbt_semantic.customers']}
+    relationships={[{ from: 'dbt_semantic.orders', to: 'dbt_semantic.customers',
+                      on: [['customer_id', 'customer_id']], type: 'left' }]}
+/>
+```
+
+The interactions are the ones Power BI and Tableau established — slicers,
+cross-filter by clicking a mark, tile layout, duplicate, present, print — and
+**a tile is nothing but a noodle spec**, so pressing *Edit* opens the same
+worksheet, with the same Show Me, level-of-detail expressions and table
+calculations. There is one place a view is built and one place it is drawn.
+
+| Module | Responsibility |
+|---|---|
+| `engine/dashboard.js` | the tile model, filter composition, save/open, publish |
+| `engine/runner.js` | spec → rows, for both backends, with stale-result guarding |
+| `noodle/Tile.svelte` | one view drawn; reports clicks, never interprets them |
+| `Studio.svelte` | the canvas, the filter bar, and the two exits |
+
+Four decisions are worth knowing about:
+
+**The filter context is merged at query time, never written into the tile.** A
+tile is always the thing its author drew, so clearing the page restores it
+exactly and a saved dashboard never carries somebody's transient click.
+
+**A cross-filter does not filter the view that raised it** — that view keeps its
+whole distribution with the selection highlighted. Filter the source and the
+bars you would have to click to change your mind vanish with it.
+
+**A filter that cannot reach a view is reported on the view.** A dashboard mixes
+sources; when there is no join path, most tools drop the filter silently and
+leave filtered and unfiltered numbers side by side looking comparable. Here the
+view names the field it could not be filtered by.
+
+**Publishing emits a working page, not a snapshot.** Page filters leave as real
+Evidence `<Dropdown>` inputs. The compiler is not re-implemented to do it: the
+filter is compiled with a unique sentinel literal and the literal is swapped for
+`${inputs.x.value}` afterwards, so the published SQL *is* the SQL that ran.
+`npm run test:dashboard` proves it by running the published query with a value
+substituted and comparing it to the compiled control.
+
+A **report** is not a styled dashboard: fixed measure, one exhibit per row on
+screen and on the page, a basis-of-preparation block, and numbered exhibits with
+source lines when it publishes.
+
+### Not built yet
+
+Tiles flow into a twelve-column grid rather than sitting at absolute
+coordinates — deliberate, since a flow reads on a laptop, a phone and paper
+without three separate layouts, but it does mean no free-form canvas and no
+overlapping tiles. Evidence's `<Grid>` carries no per-child span, so unequal tile
+widths collapse to "how many sat in that row" when published. Saves live in
+`localStorage`; sharing is by **Export**, which writes the same JSON to a file.
+
+## Jupyter notebooks as pages
+
+Any `.ipynb` under `pages/` **is** a page. `pages/notebooks/churn.ipynb` serves at
+`/notebooks/churn`, hot-reloads on save, and runs SQL, components, themes and
+prerendering through exactly the same pipeline as a `.md` page — because it is
+compiled to one before that pipeline ever sees it.
+
+This is a change to Evidence core, not a generator script. It lives in the vendored
+monorepo where it can go upstream, and `scripts/apply-notebook-core.mjs` installs it
+into the `@evidence-dev/evidence` that npm actually runs (wired to `postinstall`):
+
+| Path | What it is |
+|---|---|
+| `vendor/evidence/packages/evidence/notebook/` | the notebook → page compiler (no dependencies) |
+| `vendor/evidence/packages/evidence/cli.js` | page-pipeline wiring, in `runFileWatcher` |
+| `evidence.py` | the python helper, imported from notebooks |
+
+**Evidence renders a notebook's saved outputs — it never executes the kernel.**
+Re-run the notebook in Jupyter and save; the page recompiles on write. Nothing
+arbitrary runs at build time.
+
+### Getting values onto the page
+
+Markdown cells are already Evidence markdown, so components and ```` ```sql ```` blocks
+work with no helper at all. Use `evidence.py` when a *Python value* has to reach the page:
+
+```python
+import evidence
+
+evidence.data(df, "revenue")        # -> `revenue`, bindable by any component
+evidence.md(f"## {region}")         # computed Evidence markup, verbatim
+evidence.component("BigValue", data=evidence.ref("revenue"), value="total")
+evidence.frontmatter(title="Q3")    # same keys as a .md page's --- block
+```
+
+Datasets are inlined into the page, so aggregate in the notebook — a frame past
+~20k rows warns. pandas datetime columns are revived as JavaScript `Date`s so
+time-series components work unchanged.
+
+### Controlling what is shown
+
+A notebook is an analysis document; a page is a report. By default prose and
+results are kept and the machinery is not: **code hidden, outputs shown, stdout
+hidden, tracebacks shown**. Override per notebook in `metadata.evidence`
+(`show_code`, `show_output`, `show_stdout`, `show_errors`, plus any frontmatter
+key), or per cell with tags:
+
+`evidence:hide` · `evidence:show-input` · `evidence:hide-output` · `evidence:show-stdout` · `evidence:raw`
+
+nbconvert/JupyterBook tags (`remove-cell`, `remove-input`, `hide-input`, …) are
+honoured too, so notebooks that already declare this keep their behaviour.
+
+Outputs map by mimetype: `text/markdown` is emitted as Evidence markup verbatim
+(this is how Python writes components); images become cached static assets;
+script-bearing HTML — plotly, altair, bokeh — renders in a sized `srcdoc` iframe;
+plain HTML such as a pandas repr is injected directly; tracebacks are
+ANSI-stripped. Save figures transparent (`savefig(..., transparent=True)`) so they
+sit on both the light and dark surface.
 
 ## The skill
 
@@ -103,7 +301,25 @@ npm run sources        # re-extract sources after a sync
 npm run dev            # dev server
 npm run build          # production build (fails on broken queries — the CI gate)
 npm run preview        # preview the production build
+npm run notebooks      # re-apply the native-notebook core patch (also runs on postinstall)
+
+./cube/up.sh           # local Cube over this project's parquet (./cube/up.sh down to stop)
+npm run cube:up        # same, via docker compose where a Docker daemon is available
+
+npm run test:noodle    # 37 assertions: spec -> SQL, LOD, table calcs, Show Me
+npm run test:dashboard # 29 assertions: filter composition, save/open, published SQL
+npm run test:notebook  # 44 assertions: serializer escaping + notebook compiler
+npm run test:cube      # 34 assertions + every generated SQL executed on Cube (needs cube/up.sh)
+
+# Browser suites — need a server for the built site:
+#   npm run build && node tests/static-server.mjs build 4321
+npm run test:studio    # 26 assertions: cross-filter moves the other views, publish, print layout
+npm run test:gallery   # 10 assertions: every component on /gallery actually rendered
 ```
+
+The tests are execution-based rather than snapshot-based: generated SQL is run
+against real data and compared to an independently written control query, so
+they fail when a number changes, not when formatting does.
 
 ## Knowledge graph (agent retrieval)
 
@@ -131,12 +347,22 @@ Two upstream repos are vendored as **git submodules**, each pinned to a commit
 on `main`, so component and connector APIs can be read, diffed, and traced
 locally instead of guessed from docs:
 
-| Path | Upstream | Contains |
-|---|---|---|
-| `vendor/evidence` | [evidence-dev/evidence](https://github.com/evidence-dev/evidence) | core-components, CLI, all bundled connectors |
-| `vendor/evidence-datasources` | [evidence-dev/datasources](https://github.com/evidence-dev/datasources) | Google Sheets + InfluxDB connectors |
+| Path | Upstream | Pinned to | Contains |
+|---|---|---|---|
+| `vendor/evidence` | [evidence-dev/evidence](https://github.com/evidence-dev/evidence) | `main` | core-components, CLI, all bundled connectors |
+| `vendor/evidence-datasources` | [evidence-dev/datasources](https://github.com/evidence-dev/datasources) | `main` | Google Sheets + InfluxDB connectors |
+| `vendor/cube` | [PackMaaan/cube](https://github.com/PackMaaan/cube) | `master` | the semantic layer behind `/noodle-cube` |
+| `vendor/duckdb` | [duckdb/duckdb](https://github.com/duckdb/duckdb) | **`v1.4.2`** | engine source, for extension work |
 
-Together they cover **all 15** packages in `package.json`.
+The first two cover **all 15** packages in `package.json`.
+
+`vendor/duckdb` is pinned to the tag matching the engine actually in use
+(`@duckdb/node-api` 1.4.2-r.1 reports `v1.4.2`) rather than to `main`, so
+anything built against it links against the same version that runs. It is a
+shallow checkout (~400 MB) and nothing in the app depends on it — it exists for
+the `read_openzl()` extension sketched in
+[docs/openzl-evaluation.md](docs/openzl-evaluation.md), which is a design, not a
+commitment.
 
 ```bash
 git submodule update --init --recursive --depth 1   # first checkout (or clone with --recurse-submodules)

@@ -1,0 +1,15 @@
+{
+ 
+  "permissions": {
+    "allow": [
+      "Bash(podman rm *)",
+      "Bash(podman run *)",
+      "Bash(node -e ' *)",
+      "Bash(podman ps *)",
+      "Bash(kill -9 48968)",
+      "Bash(node t-cube.mjs)",
+      "Bash(node t-noodle.mjs)"
+    ]
+  }
+
+}

@@ -1,0 +1,22 @@
+{
+  "name": "evidence-connector-adbc",
+  "version": "0.1.0",
+  "description": "Arrow Database Connectivity source for Evidence — one connector for DuckDB, DuckLake, MotherDuck, PostgreSQL, ClickHouse, Snowflake and BigQuery",
+  "main": "index.cjs",
+  "type": "commonjs",
+  "evidence": {
+    "datasources": [
+      ["adbc", "arrow", "adbc-arrow"]
+    ]
+  },
+  "files": [
+    "index.cjs",
+    "drivers.cjs",
+    "arrow-types.cjs"
+  ],
+  "dependencies": {
+    "@apache-arrow/adbc-driver-manager": "^0.24.0",
+    "@evidence-dev/db-commons": "*"
+  },
+  "license": "MIT"
+}
