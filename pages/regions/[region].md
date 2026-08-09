@@ -11,11 +11,15 @@ Revenue and order metrics for **{params.region}**, excluding cancelled orders.
 [← Back to overview](/)
 
 ```sql date_bounds
-select min(metric_time) as start_date, max(metric_time) as end_date
-from ${metrics_revenue}
+-- Both ends in ONE column — DateRange runs min()/max() over the column named by
+-- dates=, so min and max in separate columns leaves it a single value to work
+-- from and every relative default anchors to the start of the data.
+select min(metric_time) as metric_time from ${metrics_revenue}
+union all
+select max(metric_time) from ${metrics_revenue}
 ```
 
-<DateRange name=date_range data={date_bounds} dates=start_date defaultValue="Last 30 Days"/>
+<DateRange name=date_range data={date_bounds} dates=metric_time defaultValue="Last 30 Days"/>
 
 ```sql kpi
 with cur as (

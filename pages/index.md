@@ -20,15 +20,22 @@ behind every number — on this same data. For the formal, print-ready version o
 these figures see the [Order Revenue Performance report](/reports/revenue-performance).
 
 ```sql date_bounds
-select min(metric_time) as start_date, max(metric_time) as end_date
-from ${metrics_revenue}
+-- DateRange takes min()/max() over the ONE column named by dates=, so both ends
+-- have to arrive in that column — two rows, not two columns of one row. Naming
+-- the min column and the max column separately leaves the picker with a single
+-- value, so its min and its max are the same day and every relative default
+-- ("Last 30 Days") anchors to the START of the data and selects a window that
+-- ends before the data begins.
+select min(metric_time) as metric_time from ${metrics_revenue}
+union all
+select max(metric_time) from ${metrics_revenue}
 ```
 
 ```sql region_list
 select distinct region from ${metrics_revenue} order by region
 ```
 
-<DateRange name=date_range data={date_bounds} dates=start_date defaultValue="Last 30 Days"/>
+<DateRange name=date_range data={date_bounds} dates=metric_time defaultValue="Last 30 Days"/>
 <Dropdown name=region data={region_list} value=region multiple=true selectAllByDefault=true title="Region"/>
 
 ```sql kpi
