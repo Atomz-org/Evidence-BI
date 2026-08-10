@@ -54,6 +54,12 @@ To rebuild the dbt project first: `REBUILD=1 ./scripts/sync-dbt.sh`
   concentration, chip-based cross-filtering with no SQL, a table with in-cell
   bars, deltas, colour scales and sparklines, and the governance trail from
   dbt YAML → compiled SQL → page.
+- **`/canvas` One Dashboard** — every tool in the project on one board over one
+  governed metrics view: a Rill canvas layout, flint-chart for every chart, a
+  Cube-style pivot whose totals are computed rather than added, Rill
+  leaderboards that cross-filter, and one notebook cell that inherits the
+  board's window and is explicitly not governed. Defined in
+  `canvas/executive.yaml`.
 - **`/rill` Explore (Rill)** — a Rill metrics view and explore dashboard,
   defined in `rill/` in Rill's own YAML schema and rendered here without a Rill
   server: a data-anchored time range with the window before it, measure cards
@@ -270,6 +276,80 @@ value is meaning one thing everywhere. So it is inspectable everywhere and
 editable nowhere, and the escape hatch under the board hands the same window to
 LiveQuery where an edit is plainly the reader's own.
 
+## One board — where the five tools stop being five tools
+
+`/canvas` is the whole project on a single page, defined by `canvas/executive.yaml`.
+
+```
+dbt          the marts, and the rule that a measure is defined once
+Rill         the canvas grammar, the window and the window before it,
+             kpi_grid, leaderboards, cross-filtering
+flint-chart  every chart — semantic types, not chart configuration
+Cube         the pivot: rows x columns x measures, with real totals
+notebooks    one cell whose SQL the reader can run
+```
+
+The layout uses Rill's canvas grammar — rows of items, twelve columns, one
+component per item. Three component types carry an `x_` prefix because Rill does
+not have them (`x_leaderboard`, `x_pivot`, `x_notebook`), so reading the file
+tells you which ideas are Rill's and which are this project's. `rill/` next door
+stays a pure Rill project.
+
+**The point is the shared scan.** Click a region on a leaderboard and the KPI
+row, both charts, the pivot, the table and the notebook cell all narrow — they
+read one filtered scan of one view. Five tools that each own their filter state
+are five dashboards on one page, and the reader is the one left to notice they
+disagree. `tests/t-canvas-ui.mjs` asserts exactly this: one click, and a count
+of what moved.
+
+**Charts are typed, not configured.** flint-chart derives axis steps, zero
+baselines, label rotation and faceting from what a column *means*. Those
+meanings come from the metrics view — `Amount` because the measure declares
+`format_preset: currency_usd` — so typing a measure once gives every chart of it
+a zero baseline, and a temperature would not get one. The generator refuses a
+semantic type flint does not register, because an unknown type is silently
+ignored rather than rejected.
+
+**The pivot's totals are computed, never added.** A total row under *Average
+order value* is not the sum of the cells and not their mean; it is the measure's
+own expression over the whole slice. On this data the difference is ~1.3% —
+small enough to survive review, large enough to be wrong. One `GROUPING SETS`
+query returns cells, row totals, column totals and the grand total, each at its
+own grain:
+
+```sql
+group by grouping sets ((region, status), (region), (status), ())
+--                       cells            row       column    grand
+```
+
+The test for this does not check that the totals look right. It checks that the
+computed total *differs* from what adding the cells would give, and separately
+that an additive measure still agrees — a pivot that summed everything would
+pass the first check on revenue alone.
+
+**One tile is not governed, and says so.** Every compiled tile shows its SQL and
+refuses to let you edit it. The notebook cell starts from the board's window and
+filters — `{{scan}}` in the layout file is substituted with them — and is then
+the reader's own.
+
+### Two defects this shook out
+
+*A chart that can resize its own container is a loop.* Flint grows its canvas
+when the data is dense; in a grid row whose height is content-driven, that
+growth resizes the container, which re-fires the chart's `ResizeObserver`. The
+page never settles and the main thread never yields, which presents as a browser
+test that hangs rather than as a visibly broken page. Chart rows now have fixed
+heights and pass `grow={false}`.
+
+*The browser suite was testing stale builds.* `tests/cdp.mjs` launched Chrome on
+a fixed debugging port. When an earlier run left Chrome alive, the new process
+could not bind, its launch URL was never visited, and the driver attached to a
+browser still showing an old page — reporting the DOM of a build several
+iterations old while a `fetch()` from inside that same page returned the current
+document. It now binds a free port before spawning, uses a throwaway profile,
+disables the HTTP cache, and fails loudly if the page under the driver is not
+the page that was asked for.
+
 ## Studio — dashboards and reports, built at runtime
 
 `/studio` is the composition layer above noodle: several views on one canvas,
@@ -447,6 +527,9 @@ npm run test:notebook  # 44 assertions: serializer escaping + notebook compiler
 npm run test:cube      # 34 assertions + every generated SQL executed on Cube (needs cube/up.sh)
 npm run test:screen    # 12 assertions: the notebook's anomaly screen, in SQL and in pandas, agree
 npm run test:rill      # 33 assertions: every Rill measure vs an independent control, 5 timezones
+npm run test:canvas    # 22 assertions: pivot totals vs controls, layout validation, semantic types
+npm run test:flint     # 14 assertions: flint assembly, the palette bridge, the option audit
+npm run dashboard:audit # 10 rules over every page — scores the pages, not the code
 
 # Browser suites — need a server for the built site:
 #   npm run build && node tests/static-server.mjs build 4321
@@ -455,6 +538,8 @@ npm run test:gallery   # 10 assertions: every component on /gallery actually ren
 npm run test:livequery # 20 checks: edit an exhibit's SQL, it redraws; writes refused; Reset restores
 npm run test:notebook:ui # 12 checks: the notebook's window/threshold controls recompute the screen
 npm run test:rill:ui   # 30 checks: cross-filter, comparison toggle, share withdrawn for a ratio
+npm run test:canvas:ui # 23 checks: one click moves every tile; pivot shelves; governed vs not
+npm run test:flint:ui  # 12 checks: every FlintChart on /flint actually painted
 ```
 
 The tests are execution-based rather than snapshot-based: generated SQL is run

@@ -30,7 +30,12 @@
     "rill:model": "node scripts/build-rill-model.mjs",
     "rill:up": "./rill/up.sh",
     "test:rill": "node tests/t-rill.mjs",
-    "test:rill:ui": "node tests/t-rill-ui.mjs"
+    "test:rill:ui": "node tests/t-rill-ui.mjs",
+    "test:canvas": "node tests/t-canvas.mjs",
+    "test:canvas:ui": "node tests/t-canvas-ui.mjs",
+    "test:flint": "node tests/t-flint.mjs",
+    "test:flint:ui": "node tests/t-flint-ui.mjs",
+    "dashboard:audit": "node scripts/dashboard-audit.mjs"
   },
   "engines": {
     "npm": ">=7.0.0",
@@ -54,12 +59,19 @@
     "@evidence-dev/sqlite": "^2.0.9",
     "@evidence-dev/trino": "^1.0.11",
     "caniuse-lite": "^1.0.30001809",
-    "evidence-connector-adbc": "file:connectors/adbc"
+    "evidence-connector-adbc": "file:connectors/adbc",
+    "flint-chart": "^0.5.0"
   },
   "overrides": {
     "jsonwebtoken": "9.0.0",
     "trim@<0.0.3": ">0.0.3",
     "sqlite3": "5.1.5",
     "axios": "^1.7.4"
-  }
+  },
+  "browserslist": [
+    "> 0.5%",
+    "last 2 versions",
+    "Firefox ESR",
+    "not dead"
+  ]
 }

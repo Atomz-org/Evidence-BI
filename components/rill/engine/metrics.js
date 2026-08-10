@@ -114,7 +114,7 @@ export const filterClauses = (metricsView, filters = {}, except = null) => {
  * The scan every query starts from: the view, windowed, filtered, and labelled
  * with which of the two windows each row belongs to.
  */
-const scanCte = (metricsView, { range, filters, except = null, includeComparison = true }) => {
+export const scanCte = (metricsView, { range, filters, except = null, includeComparison = true }) => {
 	const ts = ident(metricsView.timeseries);
 	const comparison = includeComparison ? range.comparison : null;
 	const lower = comparison ? comparison.start : range.start;
@@ -235,6 +235,68 @@ export const dimensionValuesSql = (metricsView, { dimension, range, filters, lim
 		`with ${scanCte(metricsView, { range, filters, except: dimension, includeComparison: false })}\n` +
 		`select distinct ${dimensionRef(dim)} as value from scan\n` +
 		`where ${dimensionRef(dim)} is not null\norder by 1\nlimit ${limit}`
+	);
+};
+
+/**
+ * The windowed, filtered scan as a standalone subquery.
+ *
+ * Handed to the notebook tile so a reader's own SQL inherits the board's time
+ * range and cross-filters without having to restate either. The alternative —
+ * letting the cell read the raw table — produces a panel that silently
+ * disagrees with everything above it the moment anyone clicks a leaderboard.
+ */
+export const scanSubquery = (metricsView, { range, filters }) =>
+	`(\n  select * from ${ident(viewName(metricsView))}\n` +
+	`  where ${[
+		`${ident(metricsView.timeseries)} >= ${sqlTimestamp(range.start)}`,
+		`${ident(metricsView.timeseries)} < ${sqlTimestamp(range.end)}`,
+		...filterClauses(metricsView, filters)
+	].join('\n    and ')}\n)`;
+
+/**
+ * The general grouped query: any dimensions, optionally a time bucket, any
+ * measures, one or both windows.
+ *
+ * Every chart tile on the canvas is one call to this. Writing a bespoke query
+ * per chart type is how two tiles on the same board come to disagree about what
+ * a filter means.
+ *
+ * @param {object} metricsView
+ * @param {object} args
+ * @param {string[]} [args.dimensions] dimension names to group by
+ * @param {string|null} [args.grain] add a time bucket at this grain
+ * @param {string[]} args.measures
+ * @param {object} args.range
+ * @param {object} args.filters
+ * @param {boolean} [args.includeComparison]
+ * @param {number} [args.limit]
+ */
+export const gridSql = (
+	metricsView,
+	{ dimensions = [], grain = null, measures, range, filters, includeComparison = false, limit = 5000 }
+) => {
+	const groups = [];
+	if (grain) groups.push(`${truncExpression(ident(metricsView.timeseries), grain)} as bucket`);
+	for (const name of dimensions) {
+		const dimension = findDimension(metricsView, name);
+		if (dimension) groups.push(`${dimensionRef(dimension)} as ${ident(name)}`);
+	}
+	if (!groups.length && !measures.length) return null;
+
+	const keys = groups.map((_, i) => i + 1 + (includeComparison ? 1 : 0));
+	const selected = measureSelects(metricsView, measures);
+	if (!selected.length) return null;
+
+	return (
+		`with ${scanCte(metricsView, { range, filters, includeComparison })}\n` +
+		`select ${includeComparison ? '_window, ' : ''}${[...groups, ...selected].join(', ')}\n` +
+		`from scan\n` +
+		(groups.length || includeComparison
+			? `group by ${[...(includeComparison ? [1] : []), ...keys].join(', ')}\n`
+			: '') +
+		(groups.length ? `order by ${keys.join(', ')}\n` : '') +
+		`limit ${Math.max(1, Math.min(limit, 50000))}`
 	);
 };
 

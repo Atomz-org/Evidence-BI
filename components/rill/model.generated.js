@@ -63,8 +63,8 @@ export const RILL = {
 				{
 					"name": "order_size",
 					"label": "Order size",
-					"description": "Value bands, so a leaderboard can show mix without a measure.",
-					"expression": "case when order_amount_usd >= 500 then 'Large (500+)'\n     when order_amount_usd >= 100 then 'Medium (100-499)'\n     else 'Small (under 100)' end",
+					"description": "Value bands, so a leaderboard can show mix without a measure. Small is under $100, Medium $100-499, Large $500 and up. The thresholds live in the description rather than in the labels: a band name is an axis tick before it is documentation, and \"Small (under 100)\" clipped on a heatmap axis tells the reader neither.\n",
+					"expression": "case when order_amount_usd >= 500 then 'Large'\n     when order_amount_usd >= 100 then 'Medium'\n     else 'Small' end",
 					"isColumn": false,
 					"column": null
 				}
@@ -189,9 +189,322 @@ export const RILL = {
 			}
 		}
 	},
-	"sourceHash": "403ab0ea675d7efd"
+	"canvases": {
+		"executive": {
+			"name": "executive",
+			"file": "canvas/executive.yaml",
+			"label": "One Dashboard",
+			"description": "Where revenue came from in the selected window, what moved against the window before it, and the room to ask why.",
+			"metricsView": "orders_metrics",
+			"timeRanges": [
+				"P7D",
+				"P14D",
+				"P4W",
+				"P3M",
+				"inf"
+			],
+			"defaults": {
+				"timeRange": "P4W",
+				"comparisonMode": "time",
+				"filters": {}
+			},
+			"gapX": 12,
+			"gapY": 12,
+			"rows": [
+				{
+					"height": 112,
+					"items": [
+						{
+							"component": "kpi_grid",
+							"extension": false,
+							"width": 12,
+							"height": 112,
+							"flintTemplate": null,
+							"types": {
+								"revenue": "Amount",
+								"net_revenue": "Amount",
+								"orders": "Count",
+								"line_items": "Count",
+								"customers": "Count",
+								"avg_order_value": "Amount",
+								"cancellation_rate": "Percentage",
+								"region": "Region",
+								"order_status": "Status",
+								"country_code": "Country",
+								"order_size": "Category",
+								"bucket": "Date"
+							},
+							"config": {
+								"measures": [
+									"revenue",
+									"orders",
+									"avg_order_value",
+									"cancellation_rate"
+								],
+								"comparison": true
+							}
+						}
+					]
+				},
+				{
+					"height": 360,
+					"items": [
+						{
+							"component": "line_chart",
+							"extension": false,
+							"width": 7,
+							"height": 360,
+							"flintTemplate": "Line Chart",
+							"types": {
+								"revenue": "Amount",
+								"net_revenue": "Amount",
+								"orders": "Count",
+								"line_items": "Count",
+								"customers": "Count",
+								"avg_order_value": "Amount",
+								"cancellation_rate": "Percentage",
+								"region": "Region",
+								"order_status": "Status",
+								"country_code": "Country",
+								"order_size": "Category",
+								"bucket": "Date"
+							},
+							"config": {
+								"measure": "revenue",
+								"series": "region",
+								"grain": "day",
+								"title": "Revenue by region",
+								"subtitle": "Daily. The dashed comparison lives on the KPI row, not here"
+							}
+						},
+						{
+							"component": "bar_chart",
+							"extension": false,
+							"width": 5,
+							"height": 360,
+							"flintTemplate": "Bar Chart",
+							"types": {
+								"revenue": "Amount",
+								"net_revenue": "Amount",
+								"orders": "Count",
+								"line_items": "Count",
+								"customers": "Count",
+								"avg_order_value": "Amount",
+								"cancellation_rate": "Percentage",
+								"region": "Region",
+								"order_status": "Status",
+								"country_code": "Country",
+								"order_size": "Category",
+								"bucket": "Date"
+							},
+							"config": {
+								"measure": "revenue",
+								"dimension": "order_status",
+								"orientation": "horizontal",
+								"title": "Where revenue sits",
+								"subtitle": "By current order status"
+							}
+						}
+					]
+				},
+				{
+					"height": 290,
+					"items": [
+						{
+							"component": "x_leaderboard",
+							"extension": true,
+							"width": 6,
+							"height": 290,
+							"flintTemplate": null,
+							"types": {
+								"revenue": "Amount",
+								"net_revenue": "Amount",
+								"orders": "Count",
+								"line_items": "Count",
+								"customers": "Count",
+								"avg_order_value": "Amount",
+								"cancellation_rate": "Percentage",
+								"region": "Region",
+								"order_status": "Status",
+								"country_code": "Country",
+								"order_size": "Category",
+								"bucket": "Date"
+							},
+							"config": {
+								"dimension": "region",
+								"measure": "revenue"
+							}
+						},
+						{
+							"component": "x_leaderboard",
+							"extension": true,
+							"width": 6,
+							"height": 290,
+							"flintTemplate": null,
+							"types": {
+								"revenue": "Amount",
+								"net_revenue": "Amount",
+								"orders": "Count",
+								"line_items": "Count",
+								"customers": "Count",
+								"avg_order_value": "Amount",
+								"cancellation_rate": "Percentage",
+								"region": "Region",
+								"order_status": "Status",
+								"country_code": "Country",
+								"order_size": "Category",
+								"bucket": "Date"
+							},
+							"config": {
+								"dimension": "country_code",
+								"measure": "revenue"
+							}
+						}
+					]
+				},
+				{
+					"height": 400,
+					"items": [
+						{
+							"component": "x_pivot",
+							"extension": true,
+							"width": 12,
+							"height": 400,
+							"flintTemplate": null,
+							"types": {
+								"revenue": "Amount",
+								"net_revenue": "Amount",
+								"orders": "Count",
+								"line_items": "Count",
+								"customers": "Count",
+								"avg_order_value": "Amount",
+								"cancellation_rate": "Percentage",
+								"region": "Region",
+								"order_status": "Status",
+								"country_code": "Country",
+								"order_size": "Category",
+								"bucket": "Date"
+							},
+							"config": {
+								"rows": [
+									"region"
+								],
+								"columns": [
+									"order_status"
+								],
+								"measures": [
+									"revenue",
+									"avg_order_value"
+								],
+								"title": "Revenue and AOV, region x status",
+								"totals": true
+							}
+						}
+					]
+				},
+				{
+					"height": 300,
+					"items": [
+						{
+							"component": "heatmap",
+							"extension": false,
+							"width": 6,
+							"height": 300,
+							"flintTemplate": "Heatmap",
+							"types": {
+								"revenue": "Amount",
+								"net_revenue": "Amount",
+								"orders": "Count",
+								"line_items": "Count",
+								"customers": "Count",
+								"avg_order_value": "Amount",
+								"cancellation_rate": "Percentage",
+								"region": "Region",
+								"order_status": "Status",
+								"country_code": "Country",
+								"order_size": "Category",
+								"bucket": "Date"
+							},
+							"config": {
+								"measure": "revenue",
+								"dimension": "order_size",
+								"y": "order_status",
+								"title": "Revenue by value band and status",
+								"subtitle": "Colour is revenue; an empty cell is a combination with no orders"
+							}
+						},
+						{
+							"component": "table",
+							"extension": false,
+							"width": 6,
+							"height": 300,
+							"flintTemplate": null,
+							"types": {
+								"revenue": "Amount",
+								"net_revenue": "Amount",
+								"orders": "Count",
+								"line_items": "Count",
+								"customers": "Count",
+								"avg_order_value": "Amount",
+								"cancellation_rate": "Percentage",
+								"region": "Region",
+								"order_status": "Status",
+								"country_code": "Country",
+								"order_size": "Category",
+								"bucket": "Date"
+							},
+							"config": {
+								"dimensions": [
+									"country_code"
+								],
+								"measures": [
+									"revenue",
+									"orders",
+									"avg_order_value"
+								],
+								"title": "Countries in the window",
+								"limit": 8
+							}
+						}
+					]
+				},
+				{
+					"height": null,
+					"items": [
+						{
+							"component": "x_notebook",
+							"extension": true,
+							"width": 12,
+							"height": null,
+							"flintTemplate": null,
+							"types": {
+								"revenue": "Amount",
+								"net_revenue": "Amount",
+								"orders": "Count",
+								"line_items": "Count",
+								"customers": "Count",
+								"avg_order_value": "Amount",
+								"cancellation_rate": "Percentage",
+								"region": "Region",
+								"order_status": "Status",
+								"country_code": "Country",
+								"order_size": "Category",
+								"bucket": "Date"
+							},
+							"config": {
+								"title": "Ask something else",
+								"markdown": "Every tile above is compiled from the metrics view and cannot be edited — that is what makes `revenue` mean one thing on this page. This cell is the opposite: it starts from the board's current window and filters, and then it is yours. Nothing you do here changes a number above it.\n",
+								"sql": "-- Orders per customer in the selected window: a shape question the\n-- metrics view has no measure for, which is exactly when to drop\n-- down to SQL rather than add one.\nselect orders_placed,\n       count(*) as customers,\n       sum(revenue) as revenue\nfrom (\n    select customer_id,\n           count(*) as orders_placed,\n           sum(order_amount_usd) as revenue\n    from {{scan}}\n    group by 1\n)\ngroup by 1\norder by 1\n"
+							}
+						}
+					]
+				}
+			]
+		}
+	},
+	"sourceHash": "7e9ac212a55f1a80"
 };
 
-export const { project, models, metricsViews, explores, sourceHash } = RILL;
+export const { project, models, metricsViews, explores, canvases, sourceHash } = RILL;
 
 export default RILL;

@@ -35,11 +35,16 @@ dimensions:
 
   - name: order_size
     display_name: Order size
-    description: Value bands, so a leaderboard can show mix without a measure.
+    description: >
+      Value bands, so a leaderboard can show mix without a measure. Small is
+      under $100, Medium $100-499, Large $500 and up. The thresholds live in the
+      description rather than in the labels: a band name is an axis tick before
+      it is documentation, and "Small (under 100)" clipped on a heatmap axis
+      tells the reader neither.
     expression: >
-      case when order_amount_usd >= 500 then 'Large (500+)'
-           when order_amount_usd >= 100 then 'Medium (100-499)'
-           else 'Small (under 100)' end
+      case when order_amount_usd >= 500 then 'Large'
+           when order_amount_usd >= 100 then 'Medium'
+           else 'Small' end
 
 measures:
   # `valid_percent_of_total` is the honest part of this file. Rill will render a

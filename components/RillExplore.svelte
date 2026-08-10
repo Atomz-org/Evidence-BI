@@ -395,7 +395,8 @@
 			</div>
 
 			<div class="controls">
-				<select bind:value={rangeToken} aria-label="Time range">
+				<!-- See Canvas.svelte: without this Chrome restores the previous range on reload. -->
+				<select bind:value={rangeToken} autocomplete="off" aria-label="Time range">
 					{#each config.timeRanges as token}
 						<option value={token}>{rangeLabel(token)}</option>
 					{/each}

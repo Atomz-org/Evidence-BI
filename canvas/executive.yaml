@@ -1,0 +1,173 @@
+# One board, five tools.
+#
+# Everything this project can do, on one page, over one governed metrics view.
+# The grammar is Rill's canvas: rows of items, twelve columns wide, exactly one
+# component per item. Three component types carry an `x_` prefix because Rill
+# does not have them — reading this file should tell you which ideas are Rill's
+# and which are this project's, and nobody should expect `rill start` to render
+# an `x_` tile. `rill/explores/revenue.yaml` next door stays pure Rill.
+#
+# Where each part comes from:
+#
+#   dbt          the marts, and the fact that a measure has one definition
+#   Rill         this grammar, the time window and the window before it,
+#                kpi_grid, leaderboards, cross-filtering
+#   flint-chart  every chart below — semantic types, not chart configuration
+#   Cube         the pivot: rows x columns x measures, totals included
+#   notebooks    x_notebook, an exhibit whose SQL the reader can run
+#
+# Nothing here restates a measure. If a number is missing, it is added to
+# rill/metrics/orders_metrics.yaml and appears everywhere at once.
+#
+# Reading order is deliberate: what happened, then where it came from, then the
+# shape of it, then room to ask something else. A board that opens on a pivot
+# has answered a question nobody asked yet.
+type: canvas
+
+display_name: One Dashboard
+description: >
+  Where revenue came from in the selected window, what moved against the window
+  before it, and the room to ask why.
+
+metrics_view: orders_metrics
+
+time_ranges:
+  - P7D
+  - P14D
+  - P4W
+  - P3M
+  - inf
+
+defaults:
+  time_range: P4W
+  comparison_mode: time
+
+gap_x: 12
+gap_y: 12
+
+rows:
+  # ---------------------------------------------------- 1. what happened --
+  # Four numbers and their change. `cancellation_rate` is declared
+  # lower_is_better in the metrics view, so its green and red are the other way
+  # round without anything here saying so.
+  - height: 112
+    items:
+      - kpi_grid:
+          measures: [revenue, orders, avg_order_value, cancellation_rate]
+          comparison: true
+
+  # ----------------------------------------------------- 2. over time, and
+  #                                                           by state --
+  # Flint decides axis steps, label rotation and whether a dense category axis
+  # has to wrap; this file only says what the columns mean. `Amount` is inferred
+  # from the measure's currency_usd preset, which is why the axis starts at zero
+  # here and would not for a temperature.
+  #
+  # A bar, not a donut. Six statuses with a long tail of tiny ones is exactly
+  # the case the chart catalog says to keep off a pie: "up to ~5 slices, when
+  # the shares are far apart. Otherwise use a bar."
+  - height: 360
+    items:
+      - width: 7
+        line_chart:
+          measure: revenue
+          series: region
+          grain: day
+          title: Revenue by region
+          subtitle: Daily. The dashed comparison lives on the KPI row, not here
+      - width: 5
+        bar_chart:
+          measure: revenue
+          dimension: order_status
+          orientation: horizontal
+          title: Where revenue sits
+          subtitle: By current order status
+
+  # ------------------------------------------------- 3. where it came from --
+  # Two leaderboards rather than one: clicking a region and then a country is
+  # the most common two-step on a board like this, and putting them side by side
+  # makes the second click obvious. Each ignores its own filter so you can add a
+  # value without clearing the first blind.
+  - height: 290
+    items:
+      - width: 6
+        x_leaderboard:
+          dimension: region
+          measure: revenue
+      - width: 6
+        x_leaderboard:
+          dimension: country_code
+          measure: revenue
+
+  # -------------------------------------------------------- 4. the shape of it --
+  # Full width because it earns it: six statuses times two measures is thirteen
+  # columns, and a pivot that scrolls sideways in a half-width tile is a pivot
+  # nobody opens.
+  # Tall enough that the Total row is on screen without scrolling. A pivot whose
+  # totals are below the fold is a pivot whose totals nobody checks, which
+  # defeats the point of computing them properly.
+  - height: 400
+    items:
+      - width: 12
+        x_pivot:
+          rows: [region]
+          columns: [order_status]
+          measures: [revenue, avg_order_value]
+          title: Revenue and AOV, region x status
+          # Totals are computed by the measure's own expression over the whole
+          # slice, never by adding the cells — see components/canvas/pivot.js.
+          totals: true
+
+  # ------------------------------------------------------- 5. two more cuts --
+  # A heatmap of value band against status: three by six, small enough to read
+  # every cell, and a question neither the trend nor the leaderboards answer.
+  # Beside it the plainest thing on the board, because sometimes the answer is
+  # a list of numbers.
+  - height: 300
+    items:
+      - width: 6
+        heatmap:
+          measure: revenue
+          # Three short bands across the bottom, six status labels up the side
+          # where a left margin can hold them. The bands were renamed in the
+          # metrics view to make this arrangement possible at all.
+          dimension: order_size
+          y: order_status
+          title: Revenue by value band and status
+          subtitle: Colour is revenue; an empty cell is a combination with no orders
+      - width: 6
+        table:
+          dimensions: [country_code]
+          measures: [revenue, orders, avg_order_value]
+          title: Countries in the window
+          limit: 8
+
+  # ---------------------------------------------------- 6. ask something else --
+  # The one tile on the board that is not governed, and says so. Everything
+  # above compiles from the metrics view; this runs whatever the reader types.
+  - items:
+      - width: 12
+        x_notebook:
+          title: Ask something else
+          markdown: >
+            Every tile above is compiled from the metrics view and cannot be
+            edited — that is what makes `revenue` mean one thing on this page.
+            This cell is the opposite: it starts from the board's current window
+            and filters, and then it is yours. Nothing you do here changes a
+            number above it.
+          sql: |
+            -- Orders per customer in the selected window: a shape question the
+            -- metrics view has no measure for, which is exactly when to drop
+            -- down to SQL rather than add one.
+            select orders_placed,
+                   count(*) as customers,
+                   sum(revenue) as revenue
+            from (
+                select customer_id,
+                       count(*) as orders_placed,
+                       sum(order_amount_usd) as revenue
+                from {{scan}}
+                group by 1
+            )
+            group by 1
+            order by 1
