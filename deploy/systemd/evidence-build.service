@@ -1,0 +1,55 @@
+# The build, as a one-shot unit.
+#
+# Everything that makes the build fit is in deploy/build.sh; this unit exists so
+# it can be triggered (`systemctl start evidence-build`), scheduled
+# (evidence-build.timer), and — critically — so systemd rather than the OOM
+# killer decides what happens when it runs out of room.
+#
+# Install: /etc/systemd/system/evidence-build.service
+
+[Unit]
+Description=Rebuild the Evidence BI site
+Documentation=file:/srv/evidence/app/deploy/README.md
+After=network-online.target
+Wants=network-online.target
+
+# Cube and the build must never be resident together: the build needs the whole
+# box. Conflicts= stops Cube when this starts; build.sh restarts it on the way
+# out, and systemd restarts it if the build is killed.
+Conflicts=evidence-cube.service
+
+[Service]
+Type=oneshot
+User=evidence
+Group=evidence
+WorkingDirectory=/srv/evidence/app
+
+# A cold build peaks around 2 GB RSS. On a 2 GB box that is only survivable
+# because zram is absorbing the overflow (deploy/zram-setup.sh).
+#
+# MemoryMax is deliberately NOT set. Capping the cgroup here would reintroduce
+# exactly the failure we are engineering around — the build would be killed at
+# the cap instead of being allowed to page into compressed RAM.
+#
+# MemorySwapMax is likewise left unbounded: swap is the mechanism, not a leak.
+#
+# OOMScoreAdjust biases the kernel toward killing this process rather than sshd
+# or Caddy if the whole box is genuinely exhausted. Losing a build is
+# recoverable; losing your way back into the server is not.
+OOMScoreAdjust=800
+
+# Builds are not urgent and must not starve the site of CPU or disk.
+Nice=10
+IOSchedulingClass=idle
+CPUWeight=20
+
+TimeoutStartSec=45min
+
+ExecStart=/srv/evidence/app/deploy/build.sh
+
+# If the build dies, the previous release is still live via the `current`
+# symlink — there is nothing to roll back, only to report.
+SuccessExitStatus=0
+
+[Install]
+WantedBy=multi-user.target

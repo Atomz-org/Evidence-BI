@@ -506,6 +506,26 @@ dashboards; kept for experiments).
 If SQLite complains about a missing native binding after install:
 `cd node_modules/sqlite3 && npm run install` (fetches the prebuilt binary).
 
+## Deploying
+
+`deploy/` runs this whole project on one 2 GB server with nothing hosted
+elsewhere — no managed database, no hosted semantic layer, no object store, no
+CDN — and without dropping a page, a connector or a surface.
+
+The site is static and every query runs in the reader's browser on duckdb-wasm,
+so serving costs ~20 MB and ten readers cost the same as one. The whole problem
+is the *build*: measured cold, it needs >1792 MB of JavaScript heap and peaks
+near 2.8 GB, and Node's heap default is sized from visible RAM so on a 2 GB box
+it dies before swap is ever reached. `deploy/README.md` has the measurements and
+the two ways out — ship the built artifact from your own machine
+(`deploy/publish.sh`), or build on the server with zram and exclusive
+sequencing (`deploy/build.sh`).
+
+```bash
+sudo deploy/install.sh          # provision a fresh 2 GB Debian/Ubuntu box
+deploy/publish.sh user@server   # or: build here, ship the artifact
+```
+
 ## Commands
 
 ```bash
@@ -530,6 +550,11 @@ npm run test:rill      # 33 assertions: every Rill measure vs an independent con
 npm run test:canvas    # 22 assertions: pivot totals vs controls, layout validation, semantic types
 npm run test:flint     # 14 assertions: flint assembly, the palette bridge, the option audit
 npm run dashboard:audit # 10 rules over every page — scores the pages, not the code
+
+sudo deploy/install.sh          # provision a 2 GB server (deploy/README.md)
+deploy/build.sh                 # rebuild on the server, sequenced to fit
+deploy/publish.sh user@server   # build locally, ship the artifact, flip the symlink
+deploy/precompress.sh build     # brotli the output: 90 MB -> 13 MB, once
 
 # Browser suites — need a server for the built site:
 #   npm run build && node tests/static-server.mjs build 4321

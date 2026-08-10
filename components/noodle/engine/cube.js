@@ -469,10 +469,36 @@ const shelfOf = (spec, pill) => {
 };
 
 /**
+ * Where Cube is, resolved in the order that keeps one page working everywhere.
+ *
+ * These requests are made by the *browser*, so a hard-coded `http://localhost:4000`
+ * is not "the server" — it is whatever is listening on the reader's own machine.
+ * That is invisible while the only reader is the person who ran `npm run dev`,
+ * and it is a broken page for everyone else the moment the site is served from
+ * a real host.
+ *
+ * So the default is same-origin: `/cubejs-api/v1/...`, which the web server
+ * proxies to Cube on loopback (deploy/Caddyfile). Cube then never needs a public
+ * port, and the page has no idea where it lives.
+ *
+ * 1. an explicit `apiUrl` — tests and anything pointing at another deployment
+ * 2. `VITE_CUBE_API_URL` — set it to http://localhost:4000 in .env for local
+ *    dev, where Evidence is on :3000 and Cube is on :4000 with no proxy between
+ * 3. same origin
+ */
+const resolveApiUrl = (apiUrl) => {
+	if (apiUrl != null && apiUrl !== '') return String(apiUrl);
+	// import.meta.env exists under Vite; in plain node (the test suites) it does not.
+	const env = typeof import.meta !== 'undefined' ? import.meta.env : undefined;
+	return env?.VITE_CUBE_API_URL ?? '';
+};
+
+/**
  * A client for one Cube deployment.
  *
  * @param {object} config
- * @param {string} config.apiUrl base URL, with or without the /cubejs-api/v1 suffix
+ * @param {string} [config.apiUrl] base URL, with or without the /cubejs-api/v1
+ *   suffix. Omit it to use the same origin as the page — see resolveApiUrl.
  * @param {string} [config.token] JWT for the security context
  * @param {typeof fetch} [config.fetch]
  */
@@ -480,7 +506,7 @@ export const createCubeClient = ({ apiUrl, token, fetch: fetchImpl } = {}) => {
 	const doFetch = fetchImpl ?? (typeof fetch !== 'undefined' ? fetch : null);
 	if (!doFetch) throw new Error('No fetch implementation available for the Cube client');
 
-	const base = String(apiUrl ?? '').replace(/\/+$/, '').replace(/\/cubejs-api\/v1$/, '');
+	const base = resolveApiUrl(apiUrl).replace(/\/+$/, '').replace(/\/cubejs-api\/v1$/, '');
 	const headers = { 'content-type': 'application/json', ...(token ? { authorization: token } : {}) };
 
 	const request = async (path, init) => {

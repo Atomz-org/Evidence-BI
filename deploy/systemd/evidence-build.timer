@@ -1,0 +1,22 @@
+# Rebuild overnight, when nobody is reading a dashboard.
+#
+# The site stays up throughout — build.sh writes to a new release directory and
+# flips a symlink — but the build wants the whole box, so it should not be
+# competing with readers for page cache.
+#
+# Install: /etc/systemd/system/evidence-build.timer
+#   systemctl enable --now evidence-build.timer
+
+[Unit]
+Description=Nightly Evidence BI rebuild
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+# A server that was asleep or down at 03:15 still gets its rebuild.
+Persistent=true
+# Do not let several boxes (or a restart storm) start builds in lockstep.
+RandomizedDelaySec=15min
+Unit=evidence-build.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,70 @@
+# Cube — the only always-on service besides the web server.
+#
+# It is here because /noodle-cube is a genuinely live surface: the browser calls
+# /cubejs-api/v1/meta and /load, and the page refuses to fall back to ungoverned
+# numbers when the model is unreachable. Nothing else in the project needs a
+# running service — /rill compiles to the browser, and every other page is
+# duckdb-wasm over parquet.
+#
+# Run natively (node), not as a container: the shipped cubejs/cube image starts
+# in dev mode with the playground and a Cube Store process, which together cost
+# ~1 GB. This unit runs the server only.
+#
+# Install: /etc/systemd/system/evidence-cube.service
+
+[Unit]
+Description=Cube semantic layer (Evidence BI)
+Documentation=file:/srv/evidence/app/cube/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=evidence
+Group=evidence
+WorkingDirectory=/srv/evidence/app/deploy/cube
+
+# The measured shortfall is in the build, not here — but an unbounded Node heap
+# on a 2 GB box will happily grow into the page cache that is holding the site.
+# 256 MB is comfortable for this model (2 cubes, 12 members, no pre-aggregations).
+Environment=NODE_OPTIONS=--max-old-space-size=256
+
+# Dev mode serves the playground, watches the model directory and enables the
+# scaffolding API. None of that belongs on a server and all of it costs memory.
+Environment=CUBEJS_DEV_MODE=false
+Environment=NODE_ENV=production
+
+Environment=CUBEJS_DB_TYPE=duckdb
+Environment=CUBEJS_LOG_LEVEL=warn
+
+# Pinned so Cube's date logic is deterministic wherever this runs. This is NOT
+# the fix for month buckets arriving early over the SQL API — see cube/README.md,
+# "The timestamp trap".
+Environment=CUBEJS_TIMEZONE=UTC
+
+# Loopback only. Caddy reverse-proxies /cubejs-api to it, so Cube is reachable
+# from the page without ever being reachable from the network.
+Environment=CUBEJS_API_ADDRESS=127.0.0.1
+Environment=PORT=4000
+
+EnvironmentFile=-/srv/evidence/app/deploy/env
+
+ExecStart=/usr/bin/node node_modules/.bin/cubejs-server
+
+Restart=on-failure
+RestartSec=5
+
+# --- containment ------------------------------------------------------------
+# Cube reads the parquet the build produced and nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/evidence/app/deploy/cube
+ReadOnlyPaths=/srv/evidence/current
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=384M
+MemoryHigh=320M
+
+[Install]
+WantedBy=multi-user.target

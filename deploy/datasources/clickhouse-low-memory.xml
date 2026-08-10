@@ -1,0 +1,79 @@
+<!--
+  ClickHouse, sized for a 2 GB box.
+
+  Install: /etc/clickhouse-server/config.d/low-memory.xml
+
+  ClickHouse is the single heaviest process in this stack. Out of the box it
+  reserves caches and starts seven background system-log tables, and lands
+  around 1 GB resident before it has answered a query. This project asks it for
+  exactly one thing — `select region, count(), sum(amount), max(ordered_at) from
+  default.orders group by region`, once per build, over a few thousand rows.
+
+  Everything below is the difference between a warehouse and a fixture. With
+  this drop-in it settles near 350 MB, and deploy/build.sh only has it running
+  for the seconds `evidence sources` needs it.
+-->
+<clickhouse>
+    <!-- Hard ceiling. ClickHouse will error a query rather than let the kernel
+         choose which process on the box dies. -->
+    <max_server_memory_usage>402653184</max_server_memory_usage> <!-- 384 MB -->
+    <max_server_memory_usage_to_ram_ratio>0.2</max_server_memory_usage_to_ram_ratio>
+
+    <!-- Caches sized for a fixture, not a warehouse. Defaults are 5 GB mark
+         cache and 8 GB uncompressed cache — both reserved lazily, but both
+         perfectly capable of filling this box. -->
+    <mark_cache_size>134217728</mark_cache_size>          <!-- 128 MB -->
+    <uncompressed_cache_size>0</uncompressed_cache_size>
+    <index_mark_cache_size>16777216</index_mark_cache_size>
+    <index_uncompressed_cache_size>0</index_uncompressed_cache_size>
+    <mmap_cache_size>0</mmap_cache_size>
+    <compiled_expression_cache_size>0</compiled_expression_cache_size>
+
+    <!-- Thread and background pools. The defaults scale with core count and
+         each pool holds stacks we will never use. -->
+    <max_thread_pool_size>32</max_thread_pool_size>
+    <background_pool_size>2</background_pool_size>
+    <background_schedule_pool_size>2</background_schedule_pool_size>
+    <background_common_pool_size>2</background_common_pool_size>
+    <background_buffer_flush_schedule_pool_size>1</background_buffer_flush_schedule_pool_size>
+    <background_distributed_schedule_pool_size>1</background_distributed_schedule_pool_size>
+    <background_message_broker_schedule_pool_size>1</background_message_broker_schedule_pool_size>
+    <background_merges_mutations_concurrency_ratio>1</background_merges_mutations_concurrency_ratio>
+
+    <!-- Concurrency. One client, one query. -->
+    <max_concurrent_queries>8</max_concurrent_queries>
+    <max_connections>16</max_connections>
+
+    <!-- The system logs are the real surprise: each is a MergeTree table with
+         its own buffers and background merges, writing continuously about a
+         server that runs for thirty seconds a day. Off. -->
+    <query_log remove="1"/>
+    <query_thread_log remove="1"/>
+    <query_views_log remove="1"/>
+    <part_log remove="1"/>
+    <trace_log remove="1"/>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <session_log remove="1"/>
+    <text_log remove="1"/>
+    <crash_log remove="1"/>
+    <opentelemetry_span_log remove="1"/>
+    <processors_profile_log remove="1"/>
+    <backup_log remove="1"/>
+    <blob_storage_log remove="1"/>
+
+    <!-- The ADBC driver speaks the HTTP interface on 8123, never the native
+         protocol on 9000 (docs/adbc.md). Nothing here needs 9000 listening. -->
+    <listen_host>127.0.0.1</listen_host>
+    <http_port>8123</http_port>
+    <tcp_port remove="1"/>
+    <mysql_port remove="1"/>
+    <postgresql_port remove="1"/>
+    <interserver_http_port remove="1"/>
+
+    <logger>
+        <level>warning</level>
+        <size>10M</size>
+        <count>2</count>
+    </logger>
+</clickhouse>
