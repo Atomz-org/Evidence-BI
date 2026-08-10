@@ -123,7 +123,11 @@ rows:
   # every cell, and a question neither the trend nor the leaderboards answer.
   # Beside it the plainest thing on the board, because sometimes the answer is
   # a list of numbers.
-  - height: 300
+  #
+  # Taller than it looks like it needs. Six rows of cells share whatever the
+  # colour key and the two axis labels leave, and at 300px that was 81px — 13px
+  # a row, which is a gradient, not a table you can read a value out of.
+  - height: 360
     items:
       - width: 6
         heatmap:

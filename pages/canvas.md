@@ -1,6 +1,11 @@
 ---
 title: One Dashboard
 description: Every tool in this project on a single board, over one governed metrics view.
+# A twelve-column grid inside Evidence's default 736px prose column gives a
+# half-width tile 344px, and a horizontal bar chart 190px of plot after its
+# labels. The layout file says twelve columns; the page has to actually have
+# them. Same setting the studio, gallery and noodle pages use.
+full_width: true
 ---
 
 <Canvas canvas="executive"/>
@@ -56,6 +61,19 @@ board's current window and filters — `{{scan}}` in the layout file is
 substituted with them — and then it is yours. Nothing you do there moves a
 number above it.
 
+**Every tile hands over its rows, and they agree with the screen.** The ⇪ in each
+tile's header offers the same three things: copy the rows and open a blank
+Google Sheet to paste them into, copy them as TSV, or download a CSV. What you
+get is what the tile is showing — after the window, after the filter pills —
+with the metrics view's labels as the header row and raw numbers underneath,
+because `$1.2M` in a spreadsheet is a string and a column of strings does not
+sum. The pivot exports its totals with it.
+
+There is no Sheets *integration* here, and the wording is careful about it: the
+Sheets API needs OAuth and a server, and this site is static files and a
+database running in your browser. Copy-and-open is the version that needs no
+account linking and shows you the data before it goes anywhere.
+
 ## Where this board stops
 
 - **The pivot emits no intermediate subtotals.** With two dimensions down the
@@ -66,3 +84,7 @@ number above it.
   leaderboard or the notebook cell. [`/rill`](/rill) is the pure-Rill surface.
 - **Layout changes need a recompile.** `npm run rill:model` after editing
   `canvas/executive.yaml`; `npm run test:canvas` fails if you forget.
+- **A faceted chart cannot be held to a tile.** The fitter rewrites margins, not
+  layouts, so a chart Flint chose to split into panels is given the canvas it
+  planned and will overflow a fixed row. Nothing on this board facets; a tile
+  that needs to should get its own page.

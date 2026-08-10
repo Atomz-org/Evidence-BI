@@ -217,6 +217,174 @@ check(
 	'its scan is the board’s scan'
 );
 
+/* ------------------------------------------------------------ chart layout -- */
+
+// Back to the state the layout file opens on. The window and shelf tests above
+// left the board on seven days with a measure taken off the pivot, and a layout
+// assertion is only worth anything against the board as it is published.
+await page.evaluate(`
+  const s = document.querySelector('.canvas select');
+  s.value = 'P4W';
+  s.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 5000));
+`);
+
+/*
+ * A chart's layout exists as pixels and nothing else once it is drawn, so the
+ * usual way to check it is to look at a screenshot — which is how a board ships
+ * with an axis title written through its own labels for a week. The numbers that
+ * produced the picture are exact, and FlintChart keeps them on the element.
+ *
+ * These are the two failures that shipped, turned into assertions: the canvas
+ * planned taller than the tile, and the axis name given less room than the
+ * labels it has to clear.
+ */
+const layout = await page.evaluate(`
+  const measure = (() => {
+    const ctx = document.createElement('canvas').getContext('2d');
+    return (text, size, font) => { ctx.font = size + 'px ' + font; return ctx.measureText(String(text)).width; };
+  })();
+  return [...document.querySelectorAll('.canvas .flint-canvas')].map((el) => {
+    const f = el.__flint;
+    if (!f) return { missing: true };
+    const one = (v) => Array.isArray(v) ? v[0] : v;
+    const x = one(f.option.xAxis), y = one(f.option.yAxis), grid = one(f.option.grid);
+    const panel = el.closest('.panel').getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    const font = getComputedStyle(el).fontFamily;
+    const widest = (axis) => Math.max(0, ...((axis && axis.data) || []).map((d) => measure(d, (axis.axisLabel && axis.axisLabel.fontSize) || 12, font)));
+    return {
+      type: f.option.series && f.option.series[0] && f.option.series[0].type,
+      fitted: !!(f.fit && f.fit.fitted),
+      canvas: f.canvas,
+      insidePanel: box.bottom <= panel.bottom + 1 && box.right <= panel.right + 1,
+      grid,
+      plot: { w: f.canvas.width - grid.left - grid.right, h: f.canvas.height - grid.top - grid.bottom },
+      yName: y && y.name ? { gap: y.nameGap, widest: Math.ceil(widest(y)) } : null,
+      xName: x && x.name ? { gap: x.nameGap, rotate: (x.axisLabel && x.axisLabel.rotate) || 0 } : null,
+      legend: f.option.legend ? { left: one(f.option.legend).left, right: one(f.option.legend).right } : null
+    };
+  });
+`);
+
+check('every chart reports a fitted layout', layout.length === 3 && layout.every((l) => l.fitted), JSON.stringify(layout.map((l) => l.fitted)));
+
+check(
+	'no chart is drawn outside the tile it lives in',
+	layout.every((l) => l.insidePanel),
+	layout.map((l, i) => `${i}:${l.insidePanel ? 'in' : 'OUT'}`).join(' ')
+);
+
+check(
+	'every plot gets most of its tile rather than the leftovers',
+	// The board shipped with a 252px tile spending 187px on chrome. Half is a
+	// low bar and still catches that.
+	layout.every((l) => l.plot.h >= l.canvas.height * 0.5 && l.plot.w >= l.canvas.width * 0.45),
+	layout.map((l) => `${l.type} ${l.plot.w}x${l.plot.h} of ${l.canvas.width}x${l.canvas.height}`).join(' | ')
+);
+
+check(
+	'an axis title clears the labels it sits beside',
+	// The heatmap's y title was drawn through the word "cancelled": a 45px gap
+	// against a 63px label. Measured here in the page's own font.
+	layout.every((l) => !l.yName || l.yName.gap > l.yName.widest),
+	layout.filter((l) => l.yName).map((l) => `gap ${l.yName.gap} vs label ${l.yName.widest}`).join(' | ')
+);
+
+check(
+	'an axis title stays inside its own margin',
+	layout.every((l) => (!l.yName || l.grid.left >= l.yName.gap) && (!l.xName || l.grid.bottom >= l.xName.gap)),
+	layout.map((l) => `l${l.grid.left}/${l.yName?.gap ?? '-'} b${l.grid.bottom}/${l.xName?.gap ?? '-'}`).join(' | ')
+);
+
+check(
+	'labels that fit are read left to right',
+	// Flint turns a dense axis to ninety degrees. Three words across 350px are
+	// not dense, and vertical text costs both height and the reader.
+	layout.every((l) => !l.xName || l.xName.rotate === 0),
+	layout.filter((l) => l.xName).map((l) => `${l.type} rotate ${l.xName.rotate}`).join(' | ')
+);
+
+check(
+	'the legend is anchored to the tile, not to a canvas flint imagined',
+	layout.every((l) => !l.legend || (l.legend.left === undefined && l.legend.right !== undefined)),
+	JSON.stringify(layout.map((l) => l.legend))
+);
+
+/* ----------------------------------------------------------------- exports -- */
+
+// `URL` is this file's page address, which shadows the constructor.
+await page.send('Browser.grantPermissions', {
+	origin: new globalThis.URL(URL).origin,
+	permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite']
+});
+
+const exportTriggers = await page.evaluate(`
+  return [...document.querySelectorAll('.canvas [aria-haspopup="menu"]')].length;
+`);
+check(
+	'every tile that holds rows can hand them over',
+	// Three charts, two leaderboards, the pivot, the table, the notebook cell,
+	// and the headline strip's export in the board header.
+	exportTriggers === 9,
+	`${exportTriggers} export menus`
+);
+
+const menu = await page.evaluate(`
+  document.querySelectorAll('.canvas [aria-haspopup="menu"]')[1].click();
+  await new Promise(r => setTimeout(r, 120));
+  return [...document.querySelectorAll('[role="menuitem"]')].map(b => b.querySelector('strong').textContent.trim());
+`);
+check(
+	'the same three ways out of every tile',
+	menu.join(' | ') === 'Google Sheets | Copy as TSV | Download CSV',
+	menu.join(' | ')
+);
+
+/*
+ * The Sheets item is not clicked here. It opens docs.google.com, and a test
+ * suite that reaches an external service to prove a button works is a test
+ * suite that fails when the network does. What is worth asserting is the part
+ * that is ours: the rows reach the clipboard, correct and complete. The rest of
+ * that path is `window.open` on a constant.
+ */
+const copied = await page.evaluate(`
+  const items = [...document.querySelectorAll('[role="menuitem"]')];
+  items.find(b => /Copy as TSV/.test(b.textContent)).click();
+  await new Promise(r => setTimeout(r, 400));
+  const text = await navigator.clipboard.readText();
+  const lines = text.split('\\n');
+  return { header: lines[0], rows: lines.length - 1, sample: lines[1] };
+`);
+check(
+	'the export is headed the way the tile is, not with column names',
+	/^Date\tRegion\tRevenue$/.test(copied.header),
+	copied.header
+);
+check('the export carries the rows behind the chart', copied.rows > 20, `${copied.rows} rows`);
+
+// The claim worth testing: an export that disagrees with the screen is worse
+// than no export. Filter the board, then take the same tile again.
+const narrowed = await page.evaluate(`
+  const li = document.querySelectorAll('.canvas ul.board')[0].querySelectorAll('li')[0];
+  const name = li.querySelector('.name').textContent.trim();
+  li.querySelector('button.value').click();
+  await new Promise(r => setTimeout(r, 4000));
+  document.querySelectorAll('.canvas [aria-haspopup="menu"]')[1].click();
+  await new Promise(r => setTimeout(r, 120));
+  [...document.querySelectorAll('[role="menuitem"]')].find(b => /Copy as TSV/.test(b.textContent)).click();
+  await new Promise(r => setTimeout(r, 400));
+  const text = await navigator.clipboard.readText();
+  return { name, rows: text.split('\\n').length - 1, mentionsOthers: /\\bAMER\\b/.test(text) && /\\bEMEA\\b/.test(text) };
+`);
+check(
+	`the export follows the board's filter (${narrowed.name})`,
+	narrowed.rows > 0 && narrowed.rows < copied.rows && !narrowed.mentionsOthers,
+	`${copied.rows} rows unfiltered → ${narrowed.rows} filtered`
+);
+
+await page.evaluate(`document.querySelector('.canvas .clear').click(); await new Promise(r => setTimeout(r, 3000));`);
+
 /* ------------------------------------------------------------------ report -- */
 
 // Flint audits every option it builds and logs what it finds. A warning here is

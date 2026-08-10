@@ -403,13 +403,13 @@ export const RILL = {
 					]
 				},
 				{
-					"height": 300,
+					"height": 360,
 					"items": [
 						{
 							"component": "heatmap",
 							"extension": false,
 							"width": 6,
-							"height": 300,
+							"height": 360,
 							"flintTemplate": "Heatmap",
 							"types": {
 								"revenue": "Amount",
@@ -437,7 +437,7 @@ export const RILL = {
 							"component": "table",
 							"extension": false,
 							"width": 6,
-							"height": 300,
+							"height": 360,
 							"flintTemplate": null,
 							"types": {
 								"revenue": "Amount",
@@ -502,7 +502,7 @@ export const RILL = {
 			]
 		}
 	},
-	"sourceHash": "7e9ac212a55f1a80"
+	"sourceHash": "db3c40d1f2f285d5"
 };
 
 export const { project, models, metricsViews, explores, canvases, sourceHash } = RILL;

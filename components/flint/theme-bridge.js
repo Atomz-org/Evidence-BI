@@ -39,6 +39,35 @@ const each = (value, fn) => {
 	else if (value) fn(value);
 };
 
+const first = (value) => (Array.isArray(value) ? value[0] : value);
+
+/**
+ * Give each heatmap cell's label a colour that can be read against that cell.
+ *
+ * The ramp runs light→dark on a light page and dark→light on a dark one, so
+ * "which end is busy" flips with the surface; the test is always the same,
+ * whether this cell sits in the loud half of the ramp.
+ *
+ * The threshold is deliberately past the middle. Sequential ramps spend most of
+ * their perceived lightness in the top third, so switching at 0.5 flips a
+ * handful of mid cells to white text they cannot carry.
+ */
+const inkHeatmapLabels = (series, visualMap, mode) => {
+	const min = Number(visualMap?.min);
+	const max = Number(visualMap?.max);
+	if (!Number.isFinite(min) || !Number.isFinite(max) || max === min) return;
+
+	const onSurface = CHROME[mode].text;
+	const onInk = mode === 'dark' ? '#09090b' : '#ffffff';
+	series.data = (series.data ?? []).map((datum) => {
+		const value = Array.isArray(datum) ? datum[datum.length - 1] : (datum?.value?.[2] ?? datum?.value);
+		const share = (Number(value) - min) / (max - min);
+		if (!Number.isFinite(share)) return datum;
+		const colour = share > 0.62 ? onInk : onSurface;
+		return Array.isArray(datum) ? { value: datum, label: { color: colour } } : { ...datum, label: { ...(datum.label ?? {}), color: colour } };
+	});
+};
+
 /** ECharts' stock categorical palette — what we are replacing, used to detect it. */
 const ECHARTS_DEFAULTS = new Set([
 	'#5470c6',
@@ -111,9 +140,16 @@ export const applyProjectTheme = (option, { mode = 'light', font, fmt, formats =
 
 	// A continuous colour channel is one hue, light→dark, reversed on the dark
 	// surface so near-zero recedes into the page instead of glowing on it.
+	//
+	// Its endpoints are numbers, so they wear the measure's format like every
+	// other number on the page. Left alone the key reads "85" and "72247" under
+	// an axis that reads "$20k" — the same quantity, spelled two ways, on one
+	// chart.
+	const keyFormat = formats.color ?? formats.value ?? formats.y;
 	each(option.visualMap, (vm) => {
 		vm.inRange = { ...(vm.inRange ?? {}), color: SEQUENTIAL[mode] };
 		vm.textStyle = { ...(vm.textStyle ?? {}), color: chrome.muted };
+		if (keyFormat) vm.formatter = (value) => format(value, keyFormat);
 	});
 
 	const inkAxis = (axis, channel) => {
@@ -194,10 +230,17 @@ export const applyProjectTheme = (option, { mode = 'light', font, fmt, formats =
 
 	// Data labels, wherever Flint turned them on.
 	for (const s of option.series ?? []) {
-		if (s.label?.show) {
-			s.label = { ...s.label, color: chrome.text };
-			if (valueFormat && !s.label.formatter) s.label.formatter = (p) => format(p.value?.[2] ?? p.value, valueFormat);
-		}
+		if (!s.label?.show) continue;
+		s.label = { ...s.label, color: chrome.text };
+		if (valueFormat && !s.label.formatter) s.label.formatter = (p) => format(p.value?.[2] ?? p.value, valueFormat);
+
+		// A label written on a filled mark has to contrast with the *mark*, not
+		// with the page. One text colour across a heatmap is right for five cells
+		// out of six and invisible in the sixth — the darkest one, which is the
+		// cell the reader came for. ECharts takes no callback for `label.color`,
+		// so the decision is made per datum here, against the same ramp the cell
+		// is painted from.
+		if (s.type === 'heatmap') inkHeatmapLabels(s, first(option.visualMap), mode);
 	}
 
 	return option;

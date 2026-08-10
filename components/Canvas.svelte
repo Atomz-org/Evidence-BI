@@ -28,6 +28,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { browser } from '$app/environment';
 
+	import ExportMenu from './ExportMenu.svelte';
 	import FlintChart from './FlintChart.svelte';
 	import LiveQuery from './LiveQuery.svelte';
 	import { RILL } from './rill/model.generated.js';
@@ -290,8 +291,9 @@
 		const measure = measureBy[name];
 		const at = (which) => rows?.find((r) => r._window === which)?.[name] ?? null;
 		const current = at('current');
-		const change = delta(current, withComparison ? at('comparison') : null);
-		return { measure, current, change, favourable: isFavourable(change.direction, measure) };
+		const comparison = withComparison ? at('comparison') : null;
+		const change = delta(current, comparison);
+		return { measure, current, comparison, change, favourable: isFavourable(change.direction, measure) };
 	};
 
 	/**
@@ -386,6 +388,84 @@
 
 	/** See `pivotAxisOf` for why `rows` and `state` are parameters. */
 	const grid = (rows, state, tile) => shapePivot(rows, { ...state, totals: tile.config.totals !== false });
+
+	/* ------------------------------------------------------------- exports -- */
+
+	/*
+	 * Every tile hands over its rows, and every tile hands over the *same* rows
+	 * it is showing — after the board's window and after its filters. An export
+	 * that quietly ignored the pills would be worse than none: the reader would
+	 * have a spreadsheet that disagrees with the screen and no way to tell which
+	 * is wrong.
+	 *
+	 * Raw numbers, not formatted ones. `$1.2M` in a spreadsheet is a string, and
+	 * a column of strings does not sum. Labels go in the header row instead,
+	 * which is where the units belong anyway.
+	 */
+
+	/** Column keys wearing the metrics view's own labels. */
+	const exportColumns = (rows) =>
+		Object.keys(rows?.[0] ?? {}).map((key) => ({
+			key,
+			label: key === 'bucket' ? 'Date' : (measureBy[key]?.label ?? dimensionBy[key]?.label ?? key)
+		}));
+
+	const leaderboardExport = (rows, item, withComparison) =>
+		(rows ?? []).map((entry) => ({
+			[dimensionBy[item.config.dimension]?.label ?? item.config.dimension]: entry.value,
+			[measureBy[item.config.measure]?.label ?? item.config.measure]: entry.current,
+			...(withComparison ? { 'Previous window': entry.comparison } : {})
+		}));
+
+	/**
+	 * The pivot, flattened the way it reads on screen: one line per row key, one
+	 * column per column-key × measure, totals included. A spreadsheet cannot hold
+	 * a two-level header, so the two levels are joined — and the totals travel
+	 * with the cells, because they are the numbers least likely to survive being
+	 * recomputed by hand at the other end.
+	 */
+	const pivotExport = (g, state) =>
+		g.rowKeys.map((rk) => {
+			const line = { [state.rows.map((d) => dimensionBy[d]?.label ?? d).join(' · ') || 'All']: keyLabel(rk) };
+			for (const ck of g.colKeys) {
+				for (const m of state.measures) {
+					const under = g.colKeys.length > 1 || !isTotalKey(ck) ? `${keyLabel(ck)} · ` : '';
+					line[`${under}${measureBy[m]?.label ?? m}`] = g.cell(rk, ck, m);
+				}
+			}
+			return line;
+		});
+
+	/**
+	 * The headline numbers, hoisted so the board header can hand them over.
+	 *
+	 * Written as a reactive block that names `results`, `comparing` and `board`
+	 * rather than as a helper reading them from module scope: Svelte derives a
+	 * template expression's dependencies from the identifiers it mentions, so a
+	 * bare `headlineRows()` would compute once and then hand over the first
+	 * window forever, no matter what the reader picked. That trap has already
+	 * cost this file two bugs.
+	 */
+	$: headline = (() => {
+		for (const [r, row] of (board?.rows ?? []).entries()) {
+			for (const [i, item] of row.items.entries()) {
+				if (item.component !== 'kpi_grid') continue;
+				return kpiExport(results[`t${r}_${i}`], item.config.measures, comparing && item.config.comparison !== false);
+			}
+		}
+		return null;
+	})();
+
+	/** One line per headline measure, with the comparison the cards are showing. */
+	const kpiExport = (rows, measures, withComparison) =>
+		(measures ?? []).map((name) => {
+			const c = card(name, rows, withComparison);
+			return {
+				Measure: c.measure?.label ?? name,
+				Value: c.current,
+				...(withComparison ? { 'Previous window': c.comparison, Change: c.change.absolute, 'Change %': c.change.relative } : {})
+			};
+		});
 </script>
 
 {#if !board || !view}
@@ -418,6 +498,9 @@
 					<input type="checkbox" bind:checked={comparisonOn} disabled={!range?.comparison} />
 					<span>Compare to previous</span>
 				</label>
+				{#if headline?.length}
+					<ExportMenu rows={headline} name="{board.label} — headline numbers" />
+				{/if}
 			</div>
 		</header>
 
@@ -459,6 +542,11 @@
 						<!-- --------------------------------------------------- kpi_grid -- -->
 						{#if item.component === 'kpi_grid'}
 							<div class="kpis">
+								<!--
+									The strip carries no panel and no header, which is why it reads as
+									numbers rather than as a widget — so its export rides in the board
+									header instead, beside the window it applies to.
+								-->
 								{#each item.config.measures as name}
 									{@const c = card(name, data, comparing && item.config.comparison !== false)}
 									<div class="kpi">
@@ -485,7 +573,10 @@
 							<div class="panel">
 								<div class="panel-head thin">
 									<span class="by">via flint-chart · {item.flintTemplate}</span>
-									<button class="ghost" on:click={() => toggleSql(tile.id)}>{sqlShown[tile.id] ? 'Hide SQL' : 'SQL'}</button>
+									<span class="head-actions">
+										<ExportMenu rows={chartRows(data)} columns={exportColumns(chartRows(data))} name={item.config.title ?? measureBy[item.config.measure]?.label} compact />
+										<button class="ghost" on:click={() => toggleSql(tile.id)}>{sqlShown[tile.id] ? 'Hide SQL' : 'SQL'}</button>
+									</span>
 								</div>
 								<div class="body">
 									{#if data?.length}
@@ -502,9 +593,9 @@
 											fmt={fmtFor(item.config.measure)}
 											formats={formatsFor(tile, ch)}
 											title={item.config.title ?? measureBy[item.config.measure]?.label}
-											grow={false}
 											subtitle={item.config.subtitle}
-											height={(row.height ?? 320) - 108}
+											fill={true}
+											exportable={false}
 											hasTable={true}
 										/>
 									{:else}
@@ -525,7 +616,10 @@
 										{dimensionBy[item.config.dimension]?.label}
 										<span class="by">Rill · click to filter the board</span>
 									</h4>
-									<button class="ghost" on:click={() => toggleSql(tile.id)}>{sqlShown[tile.id] ? 'Hide' : 'SQL'}</button>
+									<span class="head-actions">
+										<ExportMenu rows={leaderboardExport(data, item, comparing)} name="{dimensionBy[item.config.dimension]?.label} by {measureBy[item.config.measure]?.label}" compact />
+										<button class="ghost" on:click={() => toggleSql(tile.id)}>{sqlShown[tile.id] ? 'Hide' : 'SQL'}</button>
+									</span>
 								</div>
 								<ul class="board">
 									{#each data ?? [] as entry}
@@ -560,7 +654,10 @@
 										{item.config.title ?? 'Pivot'}
 										<span class="by">Cube-style · totals computed, never added</span>
 									</h4>
-									<button class="ghost" on:click={() => toggleSql(tile.id)}>{sqlShown[tile.id] ? 'Hide' : 'SQL'}</button>
+									<span class="head-actions">
+										<ExportMenu rows={pivotExport(g, state)} name={item.config.title ?? 'Pivot'} compact />
+										<button class="ghost" on:click={() => toggleSql(tile.id)}>{sqlShown[tile.id] ? 'Hide' : 'SQL'}</button>
+									</span>
 								</div>
 
 								<div class="shelves">
@@ -650,10 +747,14 @@
 
 						<!-- ----------------------------------------------------- table -- -->
 						{:else if item.component === 'table'}
+							{@const shown = (data ?? []).slice(0, item.config.limit ?? 20)}
 							<div class="panel">
 								<div class="panel-head">
 									<h4>{item.config.title ?? 'Detail'}</h4>
-									<button class="ghost" on:click={() => toggleSql(tile.id)}>{sqlShown[tile.id] ? 'Hide' : 'SQL'}</button>
+									<span class="head-actions">
+										<ExportMenu rows={shown} columns={exportColumns(shown)} name={item.config.title ?? 'Detail'} compact />
+										<button class="ghost" on:click={() => toggleSql(tile.id)}>{sqlShown[tile.id] ? 'Hide' : 'SQL'}</button>
+									</span>
 								</div>
 								<div class="grid-wrap">
 									<table class="plain">
@@ -665,7 +766,7 @@
 											</tr>
 										</thead>
 										<tbody>
-											{#each (data ?? []).slice(0, item.config.limit ?? 20) as entry}
+											{#each shown as entry}
 												<tr>
 													{#each Object.entries(entry) as [key, value]}
 														<td>{measureBy[key] ? formatMeasure(value, measureBy[key]) : String(value ?? '—')}</td>
@@ -928,6 +1029,12 @@
 		font-weight: 400;
 		font-size: 0.7rem;
 		color: var(--muted);
+	}
+	.head-actions {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.15rem;
+		flex-shrink: 0;
 	}
 	.ghost {
 		font: inherit;

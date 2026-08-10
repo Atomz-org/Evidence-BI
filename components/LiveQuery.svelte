@@ -25,6 +25,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import ExportMenu from './ExportMenu.svelte';
 
 	/**
 	 * The page query this exhibit is built on. Its `.text` is the SQL as executed
@@ -207,6 +208,8 @@
 			<span class="badge">edited — not the published figure</span>
 		{/if}
 		<span class="count">{data.length.toLocaleString()} rows</span>
+		<!-- Whatever is on screen, edited or published — the badge beside it says which. -->
+		<ExportMenu rows={data} name={title ?? 'query'} compact />
 	</div>
 
 	{#if editorOpen}

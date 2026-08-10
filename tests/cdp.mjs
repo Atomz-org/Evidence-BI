@@ -10,6 +10,13 @@ import { spawn } from 'node:child_process';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
+/**
+ * Shared, and deliberately so — see the note where it is passed to Chrome. The
+ * consequence to remember is that a profile is single-instance: one page at a
+ * time per machine, so a suite that wants two must close the first.
+ */
+const PROFILE = '/tmp/noodle-cdp-profile';
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -60,7 +67,7 @@ export const openPage = async (url, { port, width = 1500, height = 1400, colorSc
 			// rather than a broken one. The staleness this was meant to solve was
 			// really the fixed-port attach above; with that fixed, one profile is
 			// correct.
-			'--user-data-dir=/tmp/noodle-cdp-profile',
+			`--user-data-dir=${PROFILE}`,
 			url
 		],
 		{ stdio: 'ignore' }
@@ -79,7 +86,24 @@ export const openPage = async (url, { port, width = 1500, height = 1400, colorSc
 	}
 	if (!target) {
 		chrome.kill();
-		throw new Error('Chrome did not expose a page target');
+		// Nearly always the same cause, and the bare message sends people looking
+		// in the wrong place. The profile below is shared on purpose (see the
+		// comment on `--user-data-dir`) and a profile is single-instance, so a
+		// crashed earlier run — or a suite that opens a second page before
+		// closing the first — leaves a Chrome holding it and this one never
+		// starts.
+		const { existsSync, readlinkSync } = await import('node:fs');
+		let held = '';
+		try {
+			if (existsSync(`${PROFILE}/SingletonLock`)) held = ` — ${PROFILE}/SingletonLock is held by ${readlinkSync(`${PROFILE}/SingletonLock`)}`;
+		} catch {
+			/* no lock, or not a symlink on this platform */
+		}
+		throw new Error(
+			`Chrome did not expose a page target${held}. ` +
+				`If a previous run crashed: pkill -f "user-data-dir=${PROFILE}". ` +
+				`Two pages at once need the first closed first.`
+		);
 	}
 
 	const ws = new WebSocket(target.webSocketDebuggerUrl);
@@ -169,9 +193,38 @@ export const openPage = async (url, { port, width = 1500, height = 1400, colorSc
 		return result.result.value;
 	};
 
-	const screenshot = async (path) => {
-		const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
+	/**
+	 * A picture of the settled page.
+	 *
+	 * `captureBeyondViewport: true` is the obvious way to photograph a page
+	 * taller than the window, and it lies. Chrome re-lays the page out at its
+	 * full height to take the shot, every ResizeObserver fires, every chart
+	 * re-renders — and the capture happens during that, so the image shows a
+	 * transition no reader ever sees. Measured on this board: a bar chart whose
+	 * bars start at the axis (x=98) photographed with them starting at x=52, and
+	 * back to 98 a second and a half later. Reviewing that image is reviewing a
+	 * bug that does not exist, and worse, it hides the ones that do.
+	 *
+	 * So the viewport is enlarged deliberately, the page is given time to settle
+	 * into it, and then an ordinary capture — which perturbs nothing — is taken.
+	 */
+	const screenshot = async (path, { settle = 1400 } = {}) => {
 		const { writeFileSync } = await import('node:fs');
+		const metrics = await send('Page.getLayoutMetrics');
+		const full = metrics.cssContentSize ?? metrics.contentSize;
+		let resized = false;
+		if (full?.height) {
+			await send('Emulation.setDeviceMetricsOverride', {
+				width: Math.ceil(full.width),
+				height: Math.ceil(full.height),
+				deviceScaleFactor: 1,
+				mobile: false
+			});
+			resized = true;
+			await sleep(settle);
+		}
+		const { data } = await send('Page.captureScreenshot', { format: 'png' });
+		if (resized) await send('Emulation.clearDeviceMetricsOverride');
 		writeFileSync(path, Buffer.from(data, 'base64'));
 	};
 
