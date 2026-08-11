@@ -203,8 +203,10 @@ export const planJoins = (catalog, primary, fieldIds) => {
 
 	// Breadth-first from the primary table so each reachable table joins along
 	// its shortest path — the least fan-out for the same result.
+	const required = new Set(needed);
 	const visited = new Set([primary]);
-	const joins = [];
+	/** every table the search reached, in discovery order: table -> its join */
+	const reached = new Map();
 	const queue = [primary];
 
 	while (queue.length && needed.size > 0) {
@@ -213,7 +215,7 @@ export const planJoins = (catalog, primary, fieldIds) => {
 			if (visited.has(edge.target)) continue;
 			visited.add(edge.target);
 			queue.push(edge.target);
-			joins.push({
+			reached.set(edge.target, {
 				table: edge.target,
 				type: edge.type ?? 'left',
 				on: (edge.on ?? []).map(([l, r]) => (edge.flip ? [r, l] : [l, r])),
@@ -223,6 +225,21 @@ export const planJoins = (catalog, primary, fieldIds) => {
 		}
 	}
 
+	// The search reaches every neighbour of every table it visits, not only the
+	// ones the view asked for. Joining the surplus would defeat the guarantee
+	// above: one stray left join across a one-to-many relationship fans out the
+	// base rows and inflates every measure aggregated over them. So walk back
+	// from each referenced table and keep only the joins on those paths.
+	const keep = new Set();
+	for (const table of required) {
+		if (!reached.has(table)) continue;
+		for (let node = table; node !== primary && !keep.has(node); node = reached.get(node).fromTable) {
+			keep.add(node);
+		}
+	}
+
+	// Discovery order already places each table after the one it joins from.
+	const joins = [...reached.values()].filter((join) => keep.has(join.table));
 	return { joins, unreachable: [...needed] };
 };
 

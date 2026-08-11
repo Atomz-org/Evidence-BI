@@ -21,9 +21,11 @@ from ${metrics_average_order_value}
 ```
 
 ```sql tour_dims
+-- 'Guest checkout' and 'guest' are synthetic buckets for orders with no customer
+-- record, not a real region or country — they are left out of both counts.
 select
-    count(distinct region) as regions,
-    count(distinct country_code) as countries,
+    count(distinct region) filter (where region != 'Guest checkout') as regions,
+    count(distinct country_code) filter (where country_code != 'guest') as countries,
     count(distinct order_status) as statuses
 from ${metrics_revenue_by_dimensions}
 ```
@@ -36,7 +38,9 @@ same dbt semantic-layer metrics as the [Revenue Overview](/), covering
 <Value data={tour_dims} column=countries fmt=num0/> countries and
 <Value data={tour_dims} column=regions fmt=num0/> regions, from
 <Value data={tour_scope} column=first_day fmt='mmm d, yyyy'/> to
-<Value data={tour_scope} column=last_day fmt='mmm d, yyyy'/>.
+<Value data={tour_scope} column=last_day fmt='mmm d, yyyy'/>. Guest checkouts have
+no customer record, so the semantic layer buckets them as *Guest checkout* and
+*guest* — synthetic values, excluded from both counts above.
 
 **Chapter 1 is that paragraph.** Every figure in it is a `<Value/>` bound to a
 query — prose that recomputes when the data does, so a deck never goes stale
@@ -69,7 +73,9 @@ select distinct region from ${metrics_revenue} order by region
 
 A number with nothing to compare against is decoration. Three of these carry a
 previous-period delta computed in SQL; the fourth carries its own trajectory.
-The Revenue tile is a drill link — click it.
+The Revenue tile is a drill link whenever the region filter names exactly one
+region — with several selected there is no single page to open, so the link goes
+away rather than guessing.
 
 The comparison window is the selected range shifted back by its own length, so
 picking *All Time* deliberately blanks the deltas: there is no earlier period to
@@ -112,7 +118,8 @@ order by metric_time desc
 <Grid cols=4>
   <BigValue data={kpi} value=revenue title="Revenue" fmt=usd0k
     comparison=revenue_growth comparisonFmt=pct1 comparisonTitle="vs prev period"
-    link='/regions/EMEA'/>
+    link={Array.isArray(inputs.region.rawValues) && inputs.region.rawValues.length === 1 ? '/regions/' + inputs.region.rawValues[0].value : undefined}
+    description="Links to the selected region's page only when one region is selected. That page carries its own date range and opens on its default — the range picked here is not passed through."/>
   <BigValue data={kpi} value=order_count title="Orders" fmt=num0
     comparison=orders_growth comparisonFmt=pct1 comparisonTitle="vs prev period"/>
   <BigValue data={kpi} value=average_order_value title="Avg Order Value" fmt=usd2
@@ -184,8 +191,10 @@ order by 1, 2
 </Tab>
 </Tabs>
 
-Every chart on this page has a table view one click away. That is the rule, not
-a courtesy — a number nobody can inspect is a number nobody should act on.
+The charts that carry a *Data* tab — this one and the distribution in chapter 6 —
+put the table and its download one click away, and chapter 9 is the whole page as
+a searchable, downloadable table. A number nobody can inspect is a number nobody
+should act on.
 
 ## 5 · The same fact, read two ways
 
@@ -217,7 +226,7 @@ order by 1, 3
 <Grid cols=2>
 
 <BarChart data={weekly} x=week y=revenue series=region type=stacked yFmt=usd0k
-  title="Weekly revenue by region" subtitle="Guest checkouts carry no region — excluded by the saved query"
+  title="Weekly revenue by region" subtitle="Guest checkouts carry no region — the saved query excludes the Guest checkout bucket"
   seriesColors={{'EMEA':'#2a78d6','AMER':'#eb6834','OTHER':'#1baf7a'}}/>
 
 <Heatmap data={region_weekday} x=weekday y=region value=revenue
@@ -294,8 +303,9 @@ order by median_day desc
 ## 7 · Where revenue comes from, and what state it lands in
 
 The Sankey allocates revenue across two declared dimensions at once — region on
-the left, order state on the right. Refund exposure per region is a
-width, not a lookup.
+the left, order state on the right. Revenue here is gross and not net of refunds,
+so each band is how much of a region's revenue landed in that state — a width,
+not a lookup.
 
 ```sql flow
 select
@@ -319,6 +329,7 @@ select
 from ${metrics_revenue_by_dimensions}
 where metric_time between '${inputs.date_range.start}'::date and '${inputs.date_range.end}'::date
   and region in ${inputs.region.value}
+  and country_code != 'guest'
 group by 1, 2
 order by revenue desc
 ```
@@ -331,7 +342,7 @@ order by revenue desc
 <BubbleChart data={by_country} x=order_count y=average_order_value size=revenue series=region
   xFmt=num0 yFmt=usd0 sizeFmt=usd0k chartAreaHeight=300
   xAxisTitle="Orders" yAxisTitle="Average order value"
-  title="Country concentration" subtitle="Bubble area is revenue — volume and basket size are different problems"
+  title="Country concentration" subtitle="Bubble area is revenue — volume and basket size are different problems. Guest checkouts have no country and are excluded."
   seriesColors={{'EMEA':'#2a78d6','AMER':'#eb6834','OTHER':'#1baf7a','Guest checkout':'#eda100'}}/>
 
 ## 8 · Cross-filter without writing SQL
@@ -436,7 +447,7 @@ order by c.revenue desc
 
 <DataTable data={receipt} link=region_url search=true rows=12
   groupBy=region subtotals=true totalRow=true downloadable=true
-  title="Revenue by region and country" subtitle="Click a row to drill into the region page">
+  title="Revenue by region and country" subtitle="Click a row to drill into that region's page — it carries its own date range and opens on its default">
   <Column id=country_code title="Country"/>
   <Column id=revenue title="Revenue" fmt=usd0 contentType=bar/>
   <Column id=revenue_share title="Share" fmt=pct1 contentType=colorscale scaleColor=blue/>

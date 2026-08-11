@@ -377,13 +377,17 @@ Two things to be clear about:
   move gets committed and reviewed like any other change.
 - **The app runs against `node_modules`, not these checkouts.** The submodules
   are the readable reference (unminified source, stories, tests, git history).
-  The sync script's drift check compares vendored versions against the ones
-  `package.json` installs — currently all 15 match.
+  The sync script's drift check compares each vendored version against the
+  version npm actually resolves in `package-lock.json` — not against the range
+  in `package.json`, which `^1.0.0` could satisfy with `1.5.0`. A declared
+  `@evidence-dev` package missing from every vendored repo counts as drift too,
+  since the cookbook cannot be verified against source that is not here.
+  Currently all 15 match.
 
 Note that `evidence-dev/datasources` is a low-traffic repo (last upstream push
 June 2024), so the Google Sheets connector there moves far more slowly than the
-main monorepo. A `--check` run that reports "no upstream change" for it is
-normal, not a broken fetch.
+main monorepo. `--check` does not contact the remote at all — it reports the
+current pointer and says so, rather than claiming upstream has not moved.
 
 `vendor/` is excluded from the knowledge graph via `.graphifyignore` — ~3k
 upstream files would swamp this project's own graph. To graph it, run
