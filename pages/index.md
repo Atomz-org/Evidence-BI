@@ -14,6 +14,11 @@ Gross order revenue in USD, **excluding cancelled orders** and internal test
 accounts; not net of refunds. Every number on this page is a dbt semantic-layer
 metric (`models/semantic/_metrics.yml`), compiled to `queries/metrics/`.
 
+New here? The [Feature Tour](/showcase) walks the whole capability surface —
+cross-filtering, drill-through, distributions, flow, and the governance trail
+behind every number — on this same data. For the formal, print-ready version of
+these figures see the [Order Revenue Performance report](/reports/revenue-performance).
+
 ```sql date_bounds
 select min(metric_time) as start_date, max(metric_time) as end_date
 from ${metrics_revenue}
@@ -23,7 +28,7 @@ from ${metrics_revenue}
 select distinct region from ${metrics_revenue} order by region
 ```
 
-<DateRange name=date_range data={date_bounds} dates=start_date defaultValue="All Time"/>
+<DateRange name=date_range data={date_bounds} dates=start_date defaultValue="Last 30 Days"/>
 <Dropdown name=region data={region_list} value=region multiple=true selectAllByDefault=true title="Region"/>
 
 ```sql kpi

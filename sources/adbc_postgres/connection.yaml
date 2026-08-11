@@ -1,0 +1,9 @@
+name: adbc_postgres
+type: adbc
+options:
+  flavor: postgresql
+  host: 127.0.0.1
+  port: 15433
+  user: evidence
+  password: evidence
+  database: evidence

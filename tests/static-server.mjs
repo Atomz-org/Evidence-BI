@@ -1,0 +1,55 @@
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const ROOT = path.resolve(process.argv[2]);
+const PORT = Number(process.argv[3] ?? 4321);
+
+const TYPES = {
+	'.html': 'text/html; charset=utf-8',
+	'.js': 'text/javascript; charset=utf-8',
+	'.css': 'text/css; charset=utf-8',
+	'.json': 'application/json; charset=utf-8',
+	'.png': 'image/png',
+	'.svg': 'image/svg+xml',
+	'.parquet': 'application/octet-stream',
+	'.wasm': 'application/wasm',
+	'.woff2': 'font/woff2',
+	'.arrow': 'application/octet-stream'
+};
+
+http
+	.createServer((req, res) => {
+		try {
+			// Decoding inside the try: `decodeURIComponent` throws URIError on a
+			// malformed escape like `%zz`, and an uncaught throw in a request
+			// handler kills the process — one bad request would end the run.
+			const url = decodeURIComponent(req.url.split('?')[0]);
+			// Resolving the target as relative keeps `..` from escaping ROOT the
+			// way `path.join(ROOT, '/../../etc/passwd')` would.
+			let file = path.resolve(ROOT, `.${path.posix.normalize(url)}`);
+			if (file !== ROOT && !file.startsWith(ROOT + path.sep)) {
+				res.writeHead(403);
+				res.end('forbidden');
+				return;
+			}
+			if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
+			if (!fs.existsSync(file) && fs.existsSync(`${file}.html`)) file = `${file}.html`;
+			if (!fs.existsSync(file)) {
+				res.writeHead(404);
+				res.end('not found');
+				return;
+			}
+			// No COOP/COEP: `require-corp` without matching CORP headers on every
+			// subresource blocks the duckdb-wasm worker outright.
+			res.writeHead(200, {
+				'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream',
+				'cross-origin-resource-policy': 'cross-origin'
+			});
+			fs.createReadStream(file).pipe(res);
+		} catch (e) {
+			res.writeHead(500);
+			res.end(String(e));
+		}
+	})
+	.listen(PORT, '127.0.0.1', () => console.log(`serving ${ROOT} on ${PORT}`));

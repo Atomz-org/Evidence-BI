@@ -1,0 +1,28 @@
+cubes:
+  - name: customers
+    title: Customers
+    sql: >
+      select * from read_parquet('/data/dbt_semantic/customers/customers.parquet')
+
+    dimensions:
+      - name: customer_id
+        sql: customer_id
+        type: string
+        primary_key: true
+        public: true
+      - name: country_code
+        sql: country_code
+        type: string
+        title: Country
+      - name: customer_region
+        sql: region
+        type: string
+        title: Customer Region
+      - name: first_seen_at
+        sql: first_seen_at
+        type: time
+
+    measures:
+      - name: count
+        type: count
+        title: Customers

@@ -118,6 +118,49 @@ the flagship dashboards, same as their exports feed `bi_marts`.
    identically. Ratio metrics that exclude guests from a numerator (e.g.
    `emea_revenue_share`) inherit that from the YAML filter, never from a page.
 
+## Column lineage in the knowledge graph
+
+`graphify-out/graph.json` carries the full lineage this file describes, machine-
+queryable: `loads_query` (frontmatter), `references_query` (`${}` chains),
+`reads_table`, `derived_from` (through to the dbt marts), and per-column
+`has_column` / `derives_from` / `uses_column` edges whose `context` holds the
+defining SQL expression. Before reading files to answer "how is metric X
+computed" or "what breaks if column Y changes", query the graph — it is faster
+and already resolves CTEs:
+
+```bash
+graphify explain "revenue_trailing_28d.revenue_trailing_28d"
+graphify query "what depends on orders.order_amount_usd?"
+```
+
+The AST pass cannot see Evidence frontmatter, so `scripts/graphify-lineage.py`
+(sqlglot-based, deterministic) supplies the lineage. Every record it writes is
+stamped `_origin: "lineage"`, and each run **drops the previous generation of
+those records before re-deriving them** from the files as they stand now. So
+re-running it converges: a renamed or deleted column leaves no stale edge, an
+edited SQL expression gets a fresh `context`, and running it three times in a
+row produces byte-identical `graph.json`, `GRAPH_REPORT.md` and `graph.html`.
+Records from graphify's own passes (`_origin: "ast"` / `"semantic"`) are never
+touched.
+
+One thing it still cannot do is invent a node for a page graphify has not seen:
+a page with no node in the graph is skipped, because there is nothing to hang
+its lineage off. So after adding a page, run the full sequence:
+
+```bash
+rm -rf graphify-out/     # 1. discard the old graph entirely
+/graphify                # 2. full rebuild — this is what creates the page nodes
+$(cat graphify-out/.graphify_python) scripts/graphify-lineage.py   # 3. inject lineage
+```
+
+Step 3 alone is enough after editing a query's columns or a page's SQL. It is
+also the step that rewrites `GRAPH_REPORT.md` and the embedded data in
+`graph.html`: graphify writes both during clustering, which is necessarily
+before injection, so left alone they would describe a graph that no longer
+exists. Clustering itself only runs in step 2 — nodes minted in step 3 sit
+outside every community until the next full rebuild, and the report says so
+rather than quietly dropping them from its totals.
+
 ## Alternative integration modes (when not on DuckDB)
 
 - **Warehouse exports** (BigQuery/Snowflake): dbt `saved_queries` exports land

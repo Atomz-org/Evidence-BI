@@ -1,0 +1,38 @@
+# A local Cube instance over this project's own parquet, so the semantic layer
+# can be exercised without standing up a warehouse.
+#
+#   docker compose -f cube/docker-compose.yml up -d     (or: podman-compose)
+#
+# The parquet under .evidence/template/static/data is produced by `npm run
+# sources`, and is mounted read-only — run sources first, or Cube will start
+# with nothing to read.
+services:
+  cube:
+    image: cubejs/cube:v1.7.17
+    container_name: cube-noodle
+    ports:
+      - '4000:4000' # REST + GraphQL + the playground
+      - '15432:15432' # Postgres-wire SQL API, used by Evidence sources/
+    volumes:
+      - ./model:/cube/conf/model:ro
+      - ../.evidence/template/static/data:/data:ro
+    environment:
+      CUBEJS_DEV_MODE: 'true'
+      CUBEJS_DB_TYPE: duckdb
+
+      # Pinned so Cube's own date logic is deterministic wherever this runs.
+      #
+      # Note this is NOT the fix for month buckets arriving an hour or two
+      # early. Cube's SQL API sends a truncated month as `timestamp without
+      # time zone` ("2026-07-01 00:00:00") and it is the *client* that
+      # localises it — node-postgres parses such columns in the machine's
+      # timezone, so a UTC+2 build box turns July into 2026-06-30T22:00:00Z.
+      # That has to be fixed client-side; see cube/README.md.
+      CUBEJS_TIMEZONE: UTC
+
+      CUBEJS_API_SECRET: noodle-local-dev-secret
+      CUBEJS_SQL_PORT: '15432'
+      CUBEJS_PG_SQL_PORT: '15432'
+      CUBEJS_SQL_USER: cube
+      CUBEJS_SQL_PASSWORD: cube
+      CUBEJS_LOG_LEVEL: warn

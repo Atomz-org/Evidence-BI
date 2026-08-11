@@ -1,0 +1,4 @@
+# Upstream Evidence source is a submodule (~3k files) — it would swamp this
+# project's own knowledge graph. Read it directly, or graph it separately with
+# `/graphify vendor/evidence` into its own graphify-out.
+vendor/

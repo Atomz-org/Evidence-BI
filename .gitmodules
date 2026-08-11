@@ -1,0 +1,15 @@
+[submodule "vendor/evidence"]
+	path = vendor/evidence
+	url = https://github.com/PackMaaan/evidence.git
+	branch = main
+[submodule "vendor/evidence-datasources"]
+	path = vendor/evidence-datasources
+	url = https://github.com/PackMaaan/datasources.git
+	branch = main
+[submodule "vendor/cube"]
+	path = vendor/cube
+	url = https://github.com/PackMaaan/cube
+	branch = master
+[submodule "vendor/duckdb"]
+	path = vendor/duckdb
+	url = https://github.com/PackMaaan/duckdb.git

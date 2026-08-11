@@ -2,13 +2,28 @@
   "name": "my-evidence-project",
   "version": "0.0.1",
   "scripts": {
+    "postinstall": "node scripts/apply-notebook-core.mjs",
+    "notebooks": "node scripts/apply-notebook-core.mjs",
     "build": "evidence build",
     "build:strict": "evidence build:strict",
     "dev": "evidence dev --open /",
     "test": "evidence build",
     "sources": "evidence sources",
     "sources:strict": "evidence sources --strict",
-    "preview": "evidence preview"
+    "preview": "evidence preview",
+    "cube:up": "docker compose -f cube/docker-compose.yml up -d",
+    "cube:down": "docker compose -f cube/docker-compose.yml down",
+    "test:noodle": "node tests/t-noodle.mjs",
+    "test:dashboard": "node tests/t-dashboard.mjs",
+    "test:studio": "node tests/t-studio-ui.mjs",
+    "test:notebook": "node tests/t-serialize.mjs && node tests/t-compile.mjs",
+    "test:cube": "node tests/t-cube-tz.mjs && node tests/t-cube.mjs && node tests/t-cubesql.mjs",
+    "test:cube:ui": "node tests/t-cube-ui.mjs",
+    "test:adbc": "node tests/t-adbc.mjs",
+    "adbc:drivers": "for d in duckdb postgresql clickhouse snowflake bigquery; do npx --yes @columnar-tech/dbc install $d; done",
+    "bench:layout": "node tests/bench-layout.mjs",
+    "bench:openzl": "node tests/bench-openzl.mjs",
+    "test:gallery": "node tests/t-gallery-ui.mjs"
   },
   "engines": {
     "npm": ">=7.0.0",
@@ -30,7 +45,9 @@
     "@evidence-dev/snowflake": "^1.2.4",
     "@evidence-dev/source-javascript": "^0.0.3",
     "@evidence-dev/sqlite": "^2.0.9",
-    "@evidence-dev/trino": "^1.0.11"
+    "@evidence-dev/trino": "^1.0.11",
+    "caniuse-lite": "^1.0.30001809",
+    "evidence-connector-adbc": "file:connectors/adbc"
   },
   "overrides": {
     "jsonwebtoken": "9.0.0",

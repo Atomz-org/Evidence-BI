@@ -1,0 +1,9 @@
+name: adbc_clickhouse
+type: adbc
+options:
+  flavor: clickhouse
+  host: 127.0.0.1
+  port: 8123
+  user: default
+  password: clickhouse
+  database: default

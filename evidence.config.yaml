@@ -89,3 +89,10 @@ plugins:
     "@evidence-dev/sqlite": { }
     "@evidence-dev/trino": { }
     "@evidence-dev/motherduck": { }
+
+    # Arrow Database Connectivity — one connector, seven flavors (duckdb,
+    # ducklake, motherduck, postgresql, clickhouse, snowflake, bigquery).
+    # Added alongside the connectors above, not in place of them: ADBC returns an
+    # Arrow schema, so column types are read rather than sniffed from the first
+    # rows, but the driver binaries are a separate install. See docs/adbc.md.
+    "evidence-connector-adbc": { }

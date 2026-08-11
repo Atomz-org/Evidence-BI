@@ -97,6 +97,21 @@ compiled: `queries/metrics/revenue_trailing_28d.sql`
 Today: <Value data={totals} column=revenue_mtd fmt=usd1k/> · compiled:
 `queries/metrics/revenue_mtd.sql`
 
+## Dimensional artifacts
+
+Not every compiled file is a metric. `queries/metrics/revenue_by_dimensions.sql`
+is the `revenue` and `order_count` metrics **grouped by every categorical
+dimension declared** in `_semantic_models.yml` — region, country code, order
+status, and multi-line flag — the equivalent of a single `mf query --group-by`.
+It defines nothing new: both metrics carry the same
+`order_status != 'cancelled'` filter, which is why cancelled orders never appear
+in it.
+
+It is deliberately **not** zero-filled onto the time spine — a four-dimension
+cross product would be ~98% empty rows, and every consumer aggregates over time.
+For a daily series with gaps as zeros, use `revenue.sql`. The
+[Feature Tour](/showcase) is its main consumer.
+
 ## Governance
 
 - **Change a metric in dbt, not here.** Edit `_metrics.yml` /
