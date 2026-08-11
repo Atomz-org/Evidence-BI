@@ -42,11 +42,14 @@ tag, never re-typed as a format string in a page:
 
 Evidence formats via SSF (Excel codes), so the `positive;negative` section syntax works —
 that is what puts adverse values in parentheses. To add a format, add it to that JSON
-file; do not inline a new code into a page.
+file; do not inline a new code into a page. A format code carries no colour: never add a
+`[Red]` tag to one. Colour is the renderer's job — `redNegatives` on `<Column>`,
+`<Value>`, or a DataTable column — and it is opt-in per component, not a project default.
 
 Rules that go with them:
 
-- **Adverse in parentheses, and red.** Never a bare minus sign in a report table.
+- **Adverse in parentheses.** Never a bare minus sign in a report table. Add
+  `redNegatives` to the component as well when the page wants red as well as brackets.
 - **Units in the header or subtitle**, never repeated per cell.
 - **One decimal on percentages**, two on unit currency, none on aggregate currency.
 - **Averages re-divide at every grain** — `sum(numerator) / sum(denominator)`. Averaging

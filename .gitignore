@@ -22,6 +22,17 @@ sources/dbt_semantic/*.duckdb
 graphify-out/cache/
 graphify-out/.graphify_*
 
+# graphify build metadata: manifest.json records a float mtime per file and
+# cost.json records one run's token spend, so both are rewritten on every
+# rebuild with no reviewable change. graph.json, graph.html and GRAPH_REPORT.md
+# stay tracked — they are the deliverable, and scripts/graphify-lineage.py
+# regenerates them deterministically.
+graphify-out/manifest.json
+graphify-out/cost.json
+
+# dated snapshot directories from earlier graphify runs
+graphify-out/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
+
 # scratch datasets written by tests/bench-openzl.mjs — hundreds of MB, regenerable
 .bench/
 
@@ -33,3 +44,7 @@ logs/
 
 # deploy/env is generated from deploy/env.example and is per-machine
 /deploy/env
+
+# python bytecode
+__pycache__/
+*.pyc

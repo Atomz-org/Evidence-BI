@@ -50,13 +50,22 @@ const proxyToCube = (req, res) => {
 
 http
 	.createServer((req, res) => {
-		const url = decodeURIComponent(req.url.split('?')[0]);
-
-		if (url.startsWith('/cubejs-api/')) return proxyToCube(req, res);
-
-		let file = path.join(ROOT, url);
-
 		try {
+			// Decoding inside the try: `decodeURIComponent` throws URIError on a
+			// malformed escape like `%zz`, and an uncaught throw in a request
+			// handler kills the process — one bad request would end the run.
+			const url = decodeURIComponent(req.url.split('?')[0]);
+
+			if (url.startsWith('/cubejs-api/')) return proxyToCube(req, res);
+
+			// Resolving the target as relative keeps `..` from escaping ROOT the
+			// way `path.join(ROOT, '/../../etc/passwd')` would.
+			let file = path.resolve(ROOT, `.${path.posix.normalize(url)}`);
+			if (file !== ROOT && !file.startsWith(ROOT + path.sep)) {
+				res.writeHead(403);
+				res.end('forbidden');
+				return;
+			}
 			if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
 			if (!fs.existsSync(file) && fs.existsSync(`${file}.html`)) file = `${file}.html`;
 			if (!fs.existsSync(file)) {

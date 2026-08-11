@@ -17,7 +17,7 @@
 	 * And a dashboard is saved as specifications, never as results, so reopening
 	 * it re-runs the queries instead of showing yesterday's numbers.
 	 */
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { browser } from '$app/environment';
 
 	import Noodle from './Noodle.svelte';
@@ -95,6 +95,8 @@
 
 	/* ------------------------------------------------------------- startup -- */
 
+	let themeObserver = null;
+
 	onMount(async () => {
 		if (!browser) return;
 		mode = detectMode();
@@ -118,13 +120,19 @@
 
 		refreshSaved();
 
-		const observer = new MutationObserver(() => {
+		// Svelte only honours a cleanup returned synchronously from onMount, and
+		// this callback is async — so the observer is torn down from onDestroy.
+		themeObserver = new MutationObserver(() => {
 			const next = detectMode();
 			if (next !== mode) mode = next;
 		});
-		observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
-		return () => observer.disconnect();
+		themeObserver.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class', 'data-theme']
+		});
 	});
+
+	onDestroy(() => themeObserver?.disconnect());
 
 	/** Cardinality decides bar-versus-table, so Show Me needs it before it ranks. */
 	const loadCardinality = async (query) => {

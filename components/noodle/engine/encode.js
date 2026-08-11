@@ -216,9 +216,12 @@ const scatterOption = ({ rows, columns, spec, chrome, palette, format }) => {
 	const sizeColumn = spec.size ? columns.find((c) => c.pill.key === spec.size.key) : null;
 	const detailColumn = columns.find((c) => c.role === 'dimension');
 
+	// Only colour splits the points into series; detail names the individual
+	// point in the tooltip. Without a colour column every point belongs to one
+	// series, so the legend stays out of the way.
 	const groups = new Map();
 	for (const row of rows) {
-		const key = colorColumn ? label(row[colorColumn.alias]) : (detailColumn ? 'All' : 'All');
+		const key = colorColumn ? label(row[colorColumn.alias]) : 'All';
 		if (!groups.has(key)) groups.set(key, []);
 		groups.get(key).push(row);
 	}
