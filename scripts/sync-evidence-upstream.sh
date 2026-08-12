@@ -40,7 +40,11 @@ for sub in "${SUBMODULES[@]}"; do
     fi
 
     after="$(git -C "$path" rev-parse --short HEAD)"
-    if [ "$before" = "$after" ]; then
+    if [ "$CHECK_ONLY" -eq 1 ]; then
+        # --check never contacts the remote, so it cannot know whether upstream
+        # has moved — say what was actually established, not more.
+        echo "$sub: current pointer $after (remote not checked)"
+    elif [ "$before" = "$after" ]; then
         echo "$sub: already at $after (no upstream change)"
     else
         changed=1
@@ -66,6 +70,17 @@ import json, sys, glob, os
 root = sys.argv[1]
 declared = json.load(open(os.path.join(root, "package.json")))["dependencies"]
 
+# What npm actually installs, not what package.json permits. A range like
+# ^1.0.0 can resolve to 1.5.0, so comparing the vendored source against the
+# range's lower bound would report "match" while the app runs something else.
+lock_path = os.path.join(root, "package-lock.json")
+resolved = {}
+if os.path.exists(lock_path):
+    packages = json.load(open(lock_path)).get("packages", {})
+    for path, entry in packages.items():
+        if path.startswith("node_modules/") and entry.get("version"):
+            resolved[path[len("node_modules/"):]] = entry["version"]
+
 vendored = {}
 for p in glob.glob(os.path.join(root, "vendor/**/package.json"), recursive=True):
     if f"{os.sep}node_modules{os.sep}" in p:
@@ -79,25 +94,34 @@ for p in glob.glob(os.path.join(root, "vendor/**/package.json"), recursive=True)
 
 rows, drift, unvendored = [], False, []
 for name, spec in sorted(declared.items()):
+    if not name.startswith("@evidence-dev/"):
+        continue
     v = vendored.get(name)
     if v is None:
+        # In scope but absent from every tracked repo: the cookbook cannot be
+        # verified against source that is not here, so this is drift too.
         unvendored.append(name)
+        drift = True
         continue
-    want = spec.lstrip("^~")
+    want = resolved.get(name)
+    if want is None:
+        rows.append((name, "unresolved", v, "DRIFT"))
+        drift = True
+        continue
     status = "match" if v == want else "DRIFT"
     if status == "DRIFT":
         drift = True
     rows.append((name, want, v, status))
 
 if rows:
-    print(f"vendored-vs-declared[{len(rows)}]{{package,declared,vendored,status}}:")
+    print(f"vendored-vs-installed[{len(rows)}]{{package,installed,vendored,status}}:")
     for r in rows:
         print("  " + ",".join(r))
 if unvendored:
     print(f"\nnot in any vendored repo ({len(unvendored)}): {', '.join(unvendored)}")
 if drift:
-    print("\nDRIFT: vendored source is ahead of/behind what package.json installs.")
+    print("\nDRIFT: vendored source differs from the version npm actually installs.")
     print("Either bump package.json + `npm install`, or treat vendor/ as preview-only.")
 else:
-    print("\nNo drift: every vendored package matches the installed version.")
+    print("\nNo drift: every vendored package matches the installed (lockfile) version.")
 PY

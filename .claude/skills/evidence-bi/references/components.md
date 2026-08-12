@@ -86,7 +86,7 @@ select min(metric_time) as start_date, max(metric_time) as end_date from ${metri
 select distinct region from ${metrics_revenue} order by region
 ```
 
-<DateRange name=date_range data={date_bounds} dates=start_date defaultValue="All Time"/>
+<DateRange name=date_range data={date_bounds} dates=start_date defaultValue="Last 30 Days"/>
 <Dropdown name=region data={region_list} value=region multiple=true
   selectAllByDefault=true title="Region"/>
 ```

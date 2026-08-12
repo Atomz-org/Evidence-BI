@@ -5,8 +5,9 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = '/Users/sswaminathan/Documents/claude-data-skills/Evidence';
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEMPLATE = path.join(ROOT, '.evidence/template');
 
 export const boot = async () => {

@@ -7,7 +7,6 @@ queries:
   - metrics/average_order_value.sql
   - metrics/revenue_trailing_28d.sql
   - metrics/revenue_by_dimensions.sql
-  - saved/weekly_revenue_by_region.sql
 ---
 
 ```sql date_bounds
@@ -168,7 +167,7 @@ order by seq
   <Column id=measure title="Measure"/>
   <Column id=current_period title="Current period" fmt=numacc/>
   <Column id=prior_period title="Prior period" fmt=numacc/>
-  <Column id=movement title="Movement" fmt=numacc/>
+  <Column id=movement title="Movement" fmt=numacc redNegatives/>
   <Column id=variance title="Variance" fmt=pctacc contentType=delta/>
 </DataTable>
 </LiveQuery>
@@ -235,10 +234,24 @@ entity, so removing a region from the filter never repaints the remaining series
 
 </PrintGroup>
 
-**Table 2.3 — Revenue by {inputs.grain}.** Figures as charted above.
+**Table 2.3 — Revenue by region and {inputs.grain}.** USD. The values behind Exhibit 2.2,
+before the conversion to percent of period total.
 
-<LiveQuery query={trend} title="Table 2.3" let:data>
-<DataTable data={data} totalRow=true>
+<LiveQuery query={trend_mix} title="Table 2.3" let:data>
+<DataTable data={data} rows=12 search=true
+  subtitle="Source: queries/metrics/revenue.sql">
+  <Column id=period title="Period commencing" fmt=rptdate/>
+  <Column id=region title="Region"/>
+  <Column id=revenue title="Revenue" fmt=usdacc/>
+</DataTable>
+</LiveQuery>
+
+**Table 2.4 — Revenue by {inputs.grain}.** USD. Average order value is re-divided at the
+display grain, never averaged.
+
+<LiveQuery query={trend} title="Table 2.4" let:data>
+<DataTable data={data} totalRow=true
+  subtitle="Source: queries/metrics/average_order_value.sql">
   <Column id=period title="Period commencing" fmt=rptdate/>
   <Column id=revenue title="Revenue" fmt=usdacc/>
   <Column id=order_count title="Orders" fmt=numacc/>
@@ -252,11 +265,18 @@ entity, so removing a region from the filter never repaints the remaining series
 ## 3 · Composition and concentration
 
 ```sql weekly
-select week, region, revenue
-from ${saved_weekly_revenue_by_region}
-where week between date_trunc('week', '${inputs.date_range.start}'::date) and '${inputs.date_range.end}'::date
+-- daily rows are filtered to the selected range BEFORE the week roll-up, so a start
+-- date falling mid-week never drags in revenue earned before the reporting period
+select
+    date_trunc('week', metric_time) as week,
+    region,
+    sum(revenue) as revenue
+from ${metrics_revenue}
+where metric_time between '${inputs.date_range.start}'::date and '${inputs.date_range.end}'::date
+  and region != 'Guest checkout'
   and region in ${inputs.region.value}
-order by week, region
+group by 1, 2
+order by 1, 2
 ```
 
 ```sql flow
@@ -271,11 +291,12 @@ order by 3 desc
 <PrintGroup>
 
 **Exhibit 3.1 — Weekly revenue by region.** USD. Guest checkouts carry no region and are
-excluded by the saved query.
+excluded here. Weeks are built from daily rows already inside the selected period, so the
+first and last weeks are partial rather than overstated.
 
 <LiveQuery query={weekly} title="Exhibit 3.1" let:data>
 <BarChart data={data} x=week y=revenue series=region type=stacked yFmt=usdacck
-  subtitle="Source: queries/saved/weekly_revenue_by_region.sql · dbt saved_query"
+  subtitle="Source: queries/metrics/revenue.sql · rolled up to week grain"
   seriesColors={{'EMEA':'#2a78d6','AMER':'#eb6834','OTHER':'#1baf7a'}}/>
 </LiveQuery>
 
@@ -370,8 +391,9 @@ layer (`models/semantic/_metrics.yml`), and compiled one-to-one into a SQL file 
 `queries/metrics/`. Report pages may filter, aggregate and format those metrics. They may
 not restate a business rule.
 
-1. **Scope.** Gross order revenue in USD. Cancelled orders and internal test accounts are
-   excluded by the metric filter, so no page can reinstate them.
+1. **Scope.** Gross order revenue in USD. Cancelled orders are excluded by the metric
+   filter (`order_status != 'cancelled'`), so no page can reinstate them. No other order
+   or account exclusion is applied.
 2. **Refunds.** Figures are *not* net of refunds. Refunded orders remain in revenue and are
    reported separately as exposure in section 3.
 3. **Guest checkouts.** Orders with no customer record carry no region or country. They are
@@ -396,7 +418,7 @@ not restate a business rule.
 | `revenue_growth_mom` | Derived | `offset_window: 1 month` → `lag()` at month grain | `queries/metrics/revenue_growth_mom.sql` |
 | `revenue_trailing_28d` | Cumulative | 28-day window over the zero-filled daily series | `queries/metrics/revenue_trailing_28d.sql` |
 | `revenue_mtd` | Cumulative | `grain_to_date: month` | `queries/metrics/revenue_mtd.sql` |
-| `revenue_by_dimensions` | Artifact | the two metrics above grouped by every declared dimension | `queries/metrics/revenue_by_dimensions.sql` |
+| `revenue_by_dimensions` | Artifact | `revenue` and `order_count` grouped by every declared dimension | `queries/metrics/revenue_by_dimensions.sql` |
 
 Full definitions, including descriptions and caveats, are in the
 [metric dictionary](/metrics).
