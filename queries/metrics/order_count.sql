@@ -1,5 +1,5 @@
 -- metric: order_count (simple) — models/semantic/_metrics.yml
--- "Count of non-cancelled orders, excluding internal test accounts."
+-- "Count of non-cancelled orders."
 -- measure order_count = count(order_id); filter order_status != 'cancelled'.
 with spine as (
     select date_day from dbt_semantic.time_spine

@@ -1,124 +1,75 @@
-# Graph Report - Evidence  (2026-08-07)
+# Graph Report — Evidence BI
 
-## Corpus Check
-- 32 files · ~16,770 words
-- Verdict: corpus is large enough that graph structure adds value.
+Generated from `graphify-out/graph.json` by `scripts/graphify-lineage.py`,
+after lineage injection — so every figure below describes the graph as shipped.
 
 ## Summary
-- 196 nodes · 379 edges · 19 communities (8 shown, 11 thin omitted)
-- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.9)
-- Token cost: 0 input · 0 output
+- 182 nodes · 321 edges · 10 communities
+- 33 source files referenced
+- Extraction: 320 EXTRACTED · 1 INFERRED
+- Built from commit: `ec7e706cdcc05ad5420f7ef8c5a9773e4c47657e`
 
-## Graph Freshness
-- Built from commit: `ec7e706c`
-- Run `git rev-parse HEAD` and compare to check if the graph is stale.
-- Run `graphify update .` after code changes (no API cost).
+## Edges by relation
+- `uses_column` — 85
+- `contains` — 67
+- `has_column` — 65
+- `loads_query` — 28
+- `references_query` — 25
+- `derives_from` — 15
+- `imports` — 15
+- `references` — 12
+- `derived_from` — 7
+- `calls` — 1
+- `writes` — 1
 
-## Community Hubs (Navigation)
-- dependencies
-- Enterprise reporting standard
-- revenue-performance.md
-- scripts
-- Metric Dictionary
-- Evidence BI Skill
-- customers.country_code
-- showcase.md
-- Revenue Overview
-- graphify-lineage.py
-- sync-evidence-upstream.sh
-- customers.customer_email
-- customers.customer_id
-- customers.first_seen_at
-- orders.customer_id
-- orders.line_item_count
-- orders.net_line_amount_usd
-- orders.order_status
-- orders.ordered_at
+## God Nodes (most connected — the core abstractions)
+1. `showcase.md` — 41 edges
+2. `Revenue Overview` — 37 edges
+3. `Metric Dictionary` — 33 edges
+4. `revenue-performance.md` — 30 edges
+5. `dependencies` — 16 edges
+6. `average_order_value` — 15 edges
+7. `Region Detail` — 14 edges
+8. `revenue` — 13 edges
+9. `marts.fct_orders` — 12 edges
+10. `revenue_by_dimensions` — 11 edges
 
-## God Nodes (most connected - your core abstractions)
-1. `Revenue Overview` - 49 edges
-2. `Metric Dictionary` - 44 edges
-3. `orders.region` - 23 edges
-4. `Region Detail` - 18 edges
-5. `orders.order_amount_usd` - 15 edges
-6. `orders.order_amount_usd` - 13 edges
-7. `average_order_value.revenue` - 11 edges
-8. `revenue.revenue` - 10 edges
-9. `revenue_by_dimensions` - 10 edges
-10. `Enterprise reporting standard` - 9 edges
+## Communities (10 total)
 
-## Surprising Connections (you probably didn't know these)
-- `Revenue Overview` --uses_column--> `weekly_revenue_by_region.order_count`  [EXTRACTED]
-  pages/index.md → queries/saved/weekly_revenue_by_region.sql
-- `Revenue Overview` --uses_column--> `weekly_revenue_by_region.week`  [EXTRACTED]
-  pages/index.md → queries/saved/weekly_revenue_by_region.sql
-- `Revenue Overview` --uses_column--> `revenue_mtd.metric_time`  [EXTRACTED]
-  pages/index.md → queries/metrics/revenue_mtd.sql
-- `Revenue Overview` --uses_column--> `revenue_mtd.revenue_mtd`  [EXTRACTED]
-  pages/index.md → queries/metrics/revenue_mtd.sql
-- `Revenue Overview` --uses_column--> `revenue_trailing_28d.metric_time`  [EXTRACTED]
-  pages/index.md → queries/metrics/revenue_trailing_28d.sql
+### Community 0 — "dependencies"
+Nodes (31): @evidence-dev/bigquery, @evidence-dev/connector-gsheets, @evidence-dev/core-components, @evidence-dev/csv, @evidence-dev/databricks, @evidence-dev/duckdb, @evidence-dev/evidence, @evidence-dev/motherduck (+8 more)
 
-## Import Cycles
-- None detected.
+### Community 3 — "scripts"
+Nodes (20): axios, build, build:strict, dev, engines, jsonwebtoken, name, node (+12 more)
+
+### Community 5 — "Evidence BI Skill"
+Nodes (11): Component Cookbook, Design Principles, Evidence BI README, Evidence BI Skill, Evidence Configuration, dbt Semantic Integration, dbt Semantic Layer Contract, dbt Semantic Source (+2 more)
+
+### Community 1 — "Enterprise reporting standard"
+Nodes (10): Comparatives, Enterprise reporting standard, Evidence gotcha: fenced code blocks become queries, Materiality, Number conventions, Print and export, Report page skeleton, What a report carries that a dashboard doesn't (+2 more)
+
+### Community 2 — "revenue-performance.md"
+Nodes (10): 1 · Executive summary, 1.1 Period-on-period movement, 2 · Trend and mix, 3 · Composition and concentration, 4 · Detail, 5 · Basis of preparation, 5.1 Metric register, 5.2 Data lineage (+2 more)
+
+### Community 7 — "showcase.md"
+Nodes (10): 10 · Why you can trust the numbers, 2 · One filter row drives every chart below, 3 · KPIs that carry their own comparison, 4 · A trend that changes grain on click, and a target you can drag, 5 · The same fact, read two ways, 6 · What a normal day actually looks like, 7 · Where revenue comes from, and what state it lands in, 8 · Cross-filter without writing SQL (+2 more)
+
+### Community 11 — "graphify-lineage.py"
+Nodes (4): col_id(), file_node_id(), graphify-lineage.py, main()
+
+### Community 9 — "Revenue Overview"
+Nodes (3): Region Detail, Regions Index, Revenue Overview
+
+### Community 12 — "sync-evidence-upstream.sh"
+Nodes (2): sync-evidence-upstream.sh, sync-evidence-upstream.sh script
+
+### Community 4 — "Metric Dictionary"
+Nodes (1): Metric Dictionary
 
 ## Hyperedges (group relationships)
 - **Design System Enforcement** — evidence_config, skill_design, skill_components, pages_index [EXTRACTED 0.90]
 - **Design System Enforcement** — evidence_config, skill_design_principles, skill_components [EXTRACTED 1.00]
 
-## Communities (19 total, 11 thin omitted)
-
-### Community 0 - "dependencies"
-Cohesion: 0.06
-Nodes (31): @evidence-dev/bigquery, @evidence-dev/connector-gsheets, @evidence-dev/core-components, @evidence-dev/csv, @evidence-dev/databricks, @evidence-dev/duckdb, @evidence-dev/evidence, @evidence-dev/motherduck (+23 more)
-
-### Community 1 - "Enterprise reporting standard"
-Cohesion: 0.20
-Nodes (9): Comparatives, Enterprise reporting standard, Evidence gotcha: fenced code blocks become queries, Materiality, Number conventions, Print and export, Report page skeleton, What a report carries that a dashboard doesn't (+1 more)
-
-### Community 2 - "revenue-performance.md"
-Cohesion: 0.20
-Nodes (9): 1.1 Period-on-period movement, 1 · Executive summary, 2 · Trend and mix, 3 · Composition and concentration, 4 · Detail, 5.1 Metric register, 5.2 Data lineage, 5.3 Presentation standards (+1 more)
-
-### Community 3 - "scripts"
-Cohesion: 0.10
-Nodes (19): engines, node, npm, name, overrides, axios, jsonwebtoken, sqlite3 (+11 more)
-
-### Community 4 - "Metric Dictionary"
-Cohesion: 0.12
-Nodes (30): order_count.metric_time, order_count.order_count, order_count.region, revenue_mtd.metric_time, revenue_mtd.revenue_mtd, time_spine.date_day, average_order_value.average_order_value, average_order_value.metric_time (+22 more)
-
-### Community 5 - "Evidence BI Skill"
-Cohesion: 0.22
-Nodes (10): Evidence BI Skill, Evidence Configuration, Evidence BI README, sync-dbt.sh script, Component Cookbook, dbt Semantic Integration, dbt Semantic Layer Contract, Design Principles (+2 more)
-
-### Community 7 - "showcase.md"
-Cohesion: 0.09
-Nodes (28): revenue_trailing_28d.metric_time, revenue_trailing_28d.revenue_trailing_28d, customers.country_code, customers.customer_email, customers.customer_id, customers.first_seen_at, customers.region, orders.line_item_count (+20 more)
-
-### Community 9 - "Revenue Overview"
-Cohesion: 0.13
-Nodes (40): average_order_value.average_order_value, average_order_value.metric_time, average_order_value.order_count, average_order_value.region, average_order_value.revenue, emea_revenue_share.emea_revenue, emea_revenue_share.emea_revenue_share, emea_revenue_share.metric_time (+32 more)
-
 ## Knowledge Gaps
-- **77 isolated node(s):** `name`, `version`, `build`, `build:strict`, `dev` (+72 more)
-  These have ≤1 connection - possible missing edges or undocumented components.
-- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
-
-## Suggested Questions
-_Questions this graph is uniquely positioned to answer:_
-
-- **Why does `Revenue Overview` connect `Revenue Overview` to `Metric Dictionary`, `showcase.md`?**
-  _High betweenness centrality (0.062) - this node is a cross-community bridge._
-- **Why does `dependencies` connect `dependencies` to `scripts`?**
-  _High betweenness centrality (0.054) - this node is a cross-community bridge._
-- **Why does `Metric Dictionary` connect `Metric Dictionary` to `Revenue Overview`, `showcase.md`?**
-  _High betweenness centrality (0.047) - this node is a cross-community bridge._
-- **What connects `name`, `version`, `build` to the rest of the system?**
-  _77 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `dependencies` be split into smaller, more focused modules?**
-  _Cohesion score 0.06451612903225806 - nodes in this community are weakly interconnected._
-- **Should `scripts` be split into smaller, more focused modules?**
-  _Cohesion score 0.1 - nodes in this community are weakly interconnected._
-- **Should `Metric Dictionary` be split into smaller, more focused modules?**
-  _Cohesion score 0.12413793103448276 - nodes in this community are weakly interconnected._
+- **68 node(s) with ≤1 connection:** `1.1 Period-on-period movement`, `10 · Why you can trust the numbers`, `2 · One filter row drives every chart below`, `2 · Trend and mix`, `3 · Composition and concentration` (+63 more)
+- **80 node(s) outside every community** (80 of them injected lineage). Clustering runs during the `/graphify` rebuild, before lineage injection, so a column or query node minted here is only placed in a community once the next full rebuild sees it.

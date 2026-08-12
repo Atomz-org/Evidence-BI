@@ -1,5 +1,5 @@
 -- metric: revenue (simple) — models/semantic/_metrics.yml
--- "Gross order revenue in USD, excluding cancelled orders and internal test accounts.
+-- "Gross order revenue in USD, excluding cancelled orders.
 --  NOT net of refunds — use net_revenue for that."
 -- measure order_total = sum(order_amount_usd); filter order_status != 'cancelled';
 -- fill_nulls_with 0 + join_to_timespine, applied per (day, region) as MetricFlow

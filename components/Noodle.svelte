@@ -104,6 +104,8 @@
 
 	/* ------------------------------------------------------------- startup -- */
 
+	let themeObserver = null;
+
 	onMount(async () => {
 		if (!browser) return;
 		mode = detectMode();
@@ -148,16 +150,20 @@
 			error = e?.message ?? String(e);
 		}
 
-		// Repaint when the theme switcher flips the surface underneath us.
-		const observer = new MutationObserver(() => {
+		// Repaint when the theme switcher flips the surface underneath us. Svelte
+		// only honours a cleanup returned synchronously from onMount, and this
+		// callback is async — so the observer is torn down from onDestroy instead.
+		themeObserver = new MutationObserver(() => {
 			const next = detectMode();
 			if (next !== mode) {
 				mode = next;
 				render();
 			}
 		});
-		observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
-		return () => observer.disconnect();
+		themeObserver.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class', 'data-theme']
+		});
 	});
 
 	const applyInitial = () => {
@@ -315,6 +321,7 @@
 	}
 	onDestroy(() => {
 		resizeObserver?.disconnect();
+		themeObserver?.disconnect();
 		chart?.dispose();
 	});
 
