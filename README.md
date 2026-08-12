@@ -69,6 +69,11 @@ To rebuild the dbt project first: `REBUILD=1 ./scripts/sync-dbt.sh`
   [Studio](#studio--dashboards-and-reports-built-at-runtime).
 - **`/gallery`** — the component set and the layout system, each shown working
   on real data.
+- **`/flint` Flint Charting** — the semantic charting path. `<FlintChart>` takes
+  the columns' *meaning* (`Amount`, `Region`, `Date`) and lets
+  [flint-chart](https://github.com/PackMaaan/flint-chart) derive the layout —
+  axis steps, label rotation, legend placement, when to wrap into facets. See
+  [Flint charting](#flint-charting).
 - **`/notebooks/order-anomalies` Revenue Anomaly Detection** — authored as a
   Jupyter notebook (`pages/notebooks/order-anomalies.ipynb`), not markdown. A
   pandas screen over the governed `revenue` metric, on one page with SQL KPIs
@@ -308,10 +313,63 @@ plain HTML such as a pandas repr is injected directly; tracebacks are
 ANSI-stripped. Save figures transparent (`savefig(..., transparent=True)`) so they
 sit on both the light and dark surface.
 
-## The skill
+## Flint charting
 
-`.claude/skills/evidence-bi/` loads automatically for Claude sessions in this
-project and encodes:
+`<FlintChart>` ([`components/FlintChart.svelte`](components/FlintChart.svelte)) is
+the semantic path to a chart. Evidence's own components are right when the form
+is already decided — `<LineChart>` draws a line and you tune the rest by hand.
+Flint answers the other question: hand it the columns and what they **mean**, and
+it derives the layout.
+
+```svelte
+<FlintChart
+    data={weekly}
+    chartType="Line Chart"
+    x=week y=revenue series=region
+    types={{ week: 'Date', region: 'Region', revenue: 'Amount' }}
+    fmt=usd0k
+    title="Weekly revenue by region"
+    subtitle="USD, excludes cancelled orders"
+/>
+```
+
+`Amount` says money, so zero is a meaningful baseline and the axis starts there.
+`Region` says place, so the values are categorical. `Date` says time, so the tick
+format follows the span. Change only `chartType` and all of that still holds.
+
+Division of labour:
+
+| Layer | Owns |
+|-------|------|
+| [flint-chart](https://github.com/PackMaaan/flint-chart) `assembleECharts` | Structure — mark, scales, axis steps, label rotation, faceting, overflow |
+| [`components/flint/theme-bridge.js`](components/flint/theme-bridge.js) | Ink — the validated palette, chrome, fonts, Evidence number formats |
+| [`components/FlintChart.svelte`](components/FlintChart.svelte) | Data, responsiveness, theme switching, failing loudly |
+
+**Colour is not Flint's.** Its ten `theme_spec` houses (economist, swiss, nature,
+…) are realized by the Vega-Lite assembler only — the ECharts assembler accepts
+the field and ignores it, so an option arrives wearing stock ECharts hues that
+are not CVD-checked against this project's surfaces. The bridge re-inks every
+option from `evidence.config.yaml` before it is drawn, keeping series *n* on
+palette slot *n* because slot order is the CVD-safety mechanism.
+
+Flint is a chart compiler, not a data layer: reshape in the query block, which in
+this project means starting from a metric in `queries/metrics/`.
+
+```bash
+npm run test:flint          # asserts the palette, chrome and formats reach the option
+npm run dashboard:audit     # scores every page against the design contract
+```
+
+37 chart types, 44 semantic types, and worked recipes are catalogued in
+`.claude/skills/flint-chart/`. Live examples: [`/flint`](pages/flint.md).
+
+## The skills
+
+`.claude/skills/` loads automatically for Claude sessions in this project.
+
+### `evidence-bi` — the standard
+
+Encodes:
 
 - `SKILL.md` — the metric-first procedure and non-negotiables
 - `references/design-principles.md` — form choice, page anatomy, the color
@@ -328,6 +386,31 @@ The chart palettes in `evidence.config.yaml` pass all six checks of the dataviz
 color validator (lightness band, chroma floor, CVD ΔE ≥ 8, normal-vision
 ΔE ≥ 15, contrast) on this project's real surfaces in both light and dark mode.
 
+### `flint-chart` — authoring a chart
+
+The 37-template catalog with the channels each accepts, all 44 semantic types
+with what each implies, working recipes per job, and the anti-patterns. Both
+reference files are generated from the installed library, with the regeneration
+command at the top.
+
+### `dashboard-loop` — finishing one
+
+The cycle that terminates: frame → draft → score → critique → fix one thing →
+repeat. `npm run dashboard:audit` scores a page against the non-negotiables
+mechanically (`100 − 3×errors − warnings`), so passes are comparable; seven fixed
+critique questions cover what a rule cannot see. Exit is zero errors, all seven
+questions passing, and a green build.
+
+```bash
+npm run dashboard:audit -- pages/index.md    # one page
+npm run dashboard:audit -- --json            # diff between passes
+```
+
+A page can opt out of a rule it genuinely does not apply to with
+`<!-- audit-ignore: rule-id -->`. It names rules individually; there is no "all".
+`references/rubric.md` documents every rule and its fix;
+`references/worked-example.md` is a real trace from 76/100 to clean.
+
 ## Data sources
 
 All Evidence connectors are installed and enabled (`evidence.config.yaml`):
@@ -341,8 +424,18 @@ unchanged.
 `sources/needful_things/` is the stock Evidence demo source (unused by the
 dashboards; kept for experiments).
 
-If SQLite complains about a missing native binding after install:
-`cd node_modules/sqlite3 && npm run install` (fetches the prebuilt binary).
+If SQLite complains about a missing native binding after install
+(`Cannot find module .../napi-v6-darwin-unknown-arm64/node_sqlite3.node`, which
+fails *all* of `evidence sources`, not just SQLite):
+
+```bash
+cd node_modules/sqlite3 && npx --no-install node-pre-gyp install --fallback-to-build
+```
+
+`npm rebuild sqlite3` will not fix it and exits reporting success: a global
+`allow-scripts` allowlist in `~/.npmrc` suppresses sqlite3's install hook, so the
+prebuilt binary is never fetched. Add `sqlite3` to that list to make it stick
+across reinstalls.
 
 ## Commands
 
@@ -353,6 +446,9 @@ npm run build          # production build (fails on broken queries — the CI ga
 npm run preview        # preview the production build
 npm run notebooks      # re-apply the native-notebook core patch (also runs on postinstall)
 
+npm run dashboard:audit          # score every page against the design contract
+npm run dashboard:audit -- pages/index.md --json
+
 ./cube/up.sh           # local Cube over this project's parquet (./cube/up.sh down to stop)
 npm run cube:up        # same, via docker compose where a Docker daemon is available
 
@@ -361,6 +457,7 @@ npm run test:dashboard # 29 assertions: filter composition, save/open, published
 npm run test:notebook  # 44 assertions: serializer escaping + notebook compiler
 npm run test:cube      # 34 assertions + every generated SQL executed on Cube (needs cube/up.sh)
 npm run test:screen    # 12 assertions: the notebook's anomaly screen, in SQL and in pandas, agree
+npm run test:flint     # 12 assertions: palette, chrome, formats and the chart audit
 
 # Browser suites — need a server for the built site:
 #   npm run build && node tests/static-server.mjs build 4321
@@ -368,6 +465,7 @@ npm run test:studio    # 26 assertions: cross-filter moves the other views, publ
 npm run test:gallery   # 10 assertions: every component on /gallery actually rendered
 npm run test:livequery # 20 checks: edit an exhibit's SQL, it redraws; writes refused; Reset restores
 npm run test:notebook:ui # 12 checks: the notebook's window/threshold controls recompute the screen
+npm run test:flint:ui  # 12 checks: every chart painted, in the project's hues, on the right surface
 ```
 
 The tests are execution-based rather than snapshot-based: generated SQL is run

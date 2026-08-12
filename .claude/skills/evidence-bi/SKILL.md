@@ -39,8 +39,9 @@ the two contracts below — the *semantic contract* (what a number means) and th
 5. **Use the component cookbook** for exact, working syntax (props, fmt strings,
    inputs, templated drill pages). → `references/components.md`
 6. **Check against the anti-pattern list** before you're done, then run
-   `npm run build` — a broken query fails the build, which is the point of
-   BI-as-code. → `references/design-principles.md` § Anti-patterns
+   `npm run dashboard:audit` and `npm run build` — the audit checks the
+   non-negotiables below mechanically, and a broken query fails the build, which
+   is the point of BI-as-code. → `references/design-principles.md` § Anti-patterns
 
 ## Non-negotiables
 
@@ -87,6 +88,16 @@ mechanical — see `references/dbt-semantic-layer.md`.
 | `references/components.md` | Exact Evidence syntax for every job (KPIs, filters, drills, tables) |
 | `references/dbt-semantic-layer.md` | The dbt→Evidence contract: sync, compilation rules, governance |
 | `references/enterprise-reporting.md` | Management/board packs: control block, accounting formats, comparatives, materiality, print |
+
+## Companion skills
+
+| Skill | When |
+|-------|------|
+| `.claude/skills/flint-chart` | Authoring a chart with `<FlintChart>` — semantic types, the 37-template catalog, which channels each accepts. The semantic path to a chart; Evidence's own components remain right when the form is already decided |
+| `.claude/skills/dashboard-loop` | The ask is open-ended about quality ("world-class", "improve this page"). Draft → score → critique → fix → repeat, with `npm run dashboard:audit` as the stopping criterion |
+
+The non-negotiables above are what the audit checks. When a rule and this file
+disagree, this file wins and the rule is wrong.
 
 **Dashboard or report?** A dashboard is scanned and operated; a report is circulated,
 cited and archived. Both share this palette and this metric contract, but a report also

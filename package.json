@@ -26,12 +26,22 @@
     "test:gallery": "node tests/t-gallery-ui.mjs",
     "test:livequery": "node tests/t-livequery-ui.mjs",
     "test:screen": "node tests/t-screen.mjs",
-    "test:notebook:ui": "node tests/t-notebook-ui.mjs"
+    "test:notebook:ui": "node tests/t-notebook-ui.mjs",
+    "test:flint": "node tests/t-flint.mjs",
+    "test:flint:ui": "node tests/t-flint-ui.mjs",
+    "dashboard:audit": "node scripts/dashboard-audit.mjs"
   },
   "engines": {
     "npm": ">=7.0.0",
     "node": ">=18.0.0"
   },
+  "//browserslist": "Browserslist walks up the directory tree until it finds a package.json carrying this key. Without one here it keeps going past the repo and tries to parse whatever package.json happens to sit in a parent directory, which is where the 'Could not parse ...' warning comes from. These four queries are browserslist's own defaults, so stating them changes no output — it just stops the search at the project root.",
+  "browserslist": [
+    "> 0.5%",
+    "last 2 versions",
+    "Firefox ESR",
+    "not dead"
+  ],
   "type": "module",
   "dependencies": {
     "@evidence-dev/bigquery": "^2.0.12",
@@ -50,7 +60,8 @@
     "@evidence-dev/sqlite": "^2.0.9",
     "@evidence-dev/trino": "^1.0.11",
     "caniuse-lite": "^1.0.30001809",
-    "evidence-connector-adbc": "file:connectors/adbc"
+    "evidence-connector-adbc": "file:connectors/adbc",
+    "flint-chart": "^0.5.0"
   },
   "overrides": {
     "jsonwebtoken": "9.0.0",
