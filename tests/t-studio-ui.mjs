@@ -326,6 +326,40 @@ check(
 	`${restored.chips.join(' | ')} · headline ${restored.headline}`
 );
 
+/* ------------------------------------------------------------ tile editor -- */
+
+// The drawer keeps the grid behind it live, which means a statement that writes
+// the dashboard runs while the editor is open. Written the obvious way that
+// statement re-dirties its own dependency and spins forever, and Svelte 4 has no
+// iteration cap to break out — the tab just stops answering. So the assertion
+// that matters is not what the drawer renders but that the page is still there
+// afterwards: the evaluate below cannot return from a locked-up renderer.
+await page.evaluate(`
+  [...document.querySelectorAll('.tile-tools .icon')].find((b) => b.title === 'Edit')?.click();
+  return true;
+`);
+await sleep(1200);
+
+const editing = await page.evaluate(`
+  return {
+    drawer: !!document.querySelector('.drawer, .editor'),
+    heading: [...document.querySelectorAll('strong')].some((s) => /^Editing/.test(s.textContent)),
+    tiles:   document.querySelectorAll('.tile').length
+  };
+`);
+check(
+	'opening the tile editor does not lock the page',
+	editing !== null && editing.tiles >= 1,
+	`${editing?.tiles ?? 0} tiles still rendered · drawer ${editing?.drawer} · heading ${editing?.heading}`
+);
+
+// Close it again so the modes below start from the grid, not the drawer.
+await page.evaluate(`
+  [...document.querySelectorAll('button')].find((b) => /^(Done|Close|×)$/.test(b.textContent.trim()))?.click();
+  return true;
+`);
+await sleep(500);
+
 /* ------------------------------------------------------------ report mode -- */
 
 // Captured before the switch: the dashboard grid is the layout most of the page
