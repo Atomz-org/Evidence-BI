@@ -31,43 +31,61 @@ check(
 	text.slice(0, 200).replace(/\n/g, ' ')
 );
 
-// Fields from the Cube model, not from parquet column names.
-const fields = await page.evaluate(`
-  const t = document.body.innerText;
+// The page is a Studio board over the Cube model: one canvas, four tiles, each
+// with its own Edit button opening the noodle worksheet. The governed catalog is
+// therefore *inside* a worksheet rather than on the page at rest, which is why
+// the field checks below come after opening one.
+const board = await page.evaluate(`
+  const studio = document.querySelector('.studio');
+  const tiles = [...document.querySelectorAll('.tile')];
   return {
-    revenue:    /Revenue/.test(t),
-    aov:        /Average Order Value/.test(t),
-    orders:     /Orders/.test(t),
-    region:     /Region/.test(t),
-    customers:  /Customer/.test(t)
+    exists: !!studio,
+    dark: studio ? studio.classList.contains('dark') : null,
+    tiles: tiles.length,
+    withEdit: tiles.filter(t => [...t.querySelectorAll('button')].some(b => /^edit$/i.test(b.textContent.trim()))).length,
+    // A tile renders a chart or a table; both count as rendered, neither is the empty state.
+    rendered: tiles.filter(t => t.querySelectorAll('canvas, table').length > 0).length,
+    emptyState: /Start with a field|Auto-build a draft/.test(studio?.innerText ?? '')
   };
 `);
-check('model measures present (Revenue)', fields.revenue);
-check('derived measure present (Average Order Value)', fields.aov, 'has no parquet-column equivalent');
-check('joined cube present (Customers)', fields.customers);
+check('the board rendered as one canvas', board.exists);
+check('four tiles on the board', board.tiles === 4, `${board.tiles} tiles`);
+check('every tile has its own Edit button', board.withEdit === board.tiles, `${board.withEdit}/${board.tiles}`);
+check('every tile actually rendered a view', board.rendered === board.tiles, `${board.rendered}/${board.tiles} drew a chart or table`);
+check('the board is not showing the empty state', !board.emptyState);
 
-// Counting svg/path anywhere on the page is not a test: Show Me's mark icons
-// and the site chrome supply plenty of them, which is how an earlier version of
-// this file passed while the chart area sat on its empty state. Scope to the
-// chart container, and assert the empty state is gone.
-const rendered = await page.evaluate(`
-  const viz = document.querySelector('.viz');
-  if (!viz) return { noViz: true };
+// The surface follows the page it sits on. A light page drawing the dark chrome
+// means detectMode() is wrong, and every contrast guarantee goes with it.
+check('the board follows the light page', board.dark === false, `dark=${board.dark}`);
+
+// Open a tile's worksheet and assert the catalog is Cube's model, not parquet
+// column names. Editing is the whole point of the board, so this doubles as the
+// check that the Edit button works.
+await page.evaluate(`
+  const t = [...document.querySelectorAll('.tile')][1];
+  [...t.querySelectorAll('button')].find(b => /^edit$/i.test(b.textContent.trim())).click();
+  return 1;
+`);
+await sleep(2500);
+
+const sheet = await page.evaluate(`
+  const n = document.querySelector('.noodle');
+  if (!n) return { noSheet: true };
+  const t = n.innerText;
   return {
-    emptyState: /Start with a field/.test(viz.innerText),
-    error:      /could not be built/.test(viz.innerText),
-    marks:      viz.querySelectorAll('svg path, svg rect, canvas').length,
-    rowsLabel:  (document.body.innerText.match(/(\\d+)\\s+rows/) || [])[1] ?? null
+    revenue:   /Revenue/.test(t),
+    aov:       /Average Order Value/.test(t),
+    customers: /Customer/.test(t),
+    shelves:   n.querySelectorAll('[class*=shelf]').length,
+    marks:     [...n.querySelectorAll('button')].map(b => b.textContent.trim())
+                 .filter(x => ['Bar','Line','Area','Table'].includes(x)).length
   };
 `);
-check('the chart container exists', !rendered.noViz);
-check('query returned rows', Number(rendered.rowsLabel) > 0, `${rendered.rowsLabel} rows`);
-check(
-	'chart area is NOT showing the empty state',
-	!rendered.emptyState,
-	rendered.emptyState ? 'pills are on the shelves but the view never rendered' : ''
-);
-check('a chart actually rendered inside .viz', rendered.marks > 0, `${rendered.marks} marks in .viz`);
+check('Edit opens the worksheet over the board', !sheet.noSheet);
+check('model measures present (Revenue)', sheet.revenue);
+check('derived measure present (Average Order Value)', sheet.aov, 'has no parquet-column equivalent');
+check('joined cube present (Customers)', sheet.customers);
+check('the worksheet is editable — shelves and marks', sheet.shelves > 0 && sheet.marks >= 4, `${sheet.shelves} shelves, ${sheet.marks} marks`);
 
 // Prove the data really came from Cube rather than a cached parquet view.
 const net = await page.evaluate(`

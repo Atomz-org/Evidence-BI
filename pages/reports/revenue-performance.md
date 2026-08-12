@@ -54,6 +54,21 @@ where metric_time <= '${inputs.date_range.end}'::date
   <ButtonGroupItem valueLabel="Month" value="month"/>
 </ButtonGroup>
 
+<Alert status=info>
+
+**Every exhibit opens.** Each numbered exhibit and table carries an **Edit SQL** link:
+it shows the query exactly as executed — metric references already resolved — and lets
+you change it and re-run against the same in-browser database the report uses. The
+exhibit redraws from your result, with its own formatting intact.
+
+An edited exhibit is marked as such and is **not the published figure**. Only read
+queries run, edits are yours alone, nothing is written back, and *Reset* — or a
+reload — restores the report. What a number *means* is fixed in the dbt semantic layer
+and in `queries/metrics/`; nothing you do here moves it. See §5 for the basis of
+preparation.
+
+</Alert>
+
 ## 1 · Executive summary
 
 ```sql summary
@@ -147,13 +162,15 @@ from ${movement}
 order by seq
 ```
 
-<DataTable data={movement_final}>
+<LiveQuery query={movement_final} title="Table 1.1" let:data>
+<DataTable data={data}>
   <Column id=measure title="Measure"/>
   <Column id=current_period title="Current period" fmt=numacc/>
   <Column id=prior_period title="Prior period" fmt=numacc/>
   <Column id=movement title="Movement" fmt=numacc redNegatives/>
   <Column id=variance title="Variance" fmt=pctacc contentType=delta/>
 </DataTable>
+</LiveQuery>
 
 <Alert status=info>
 
@@ -195,9 +212,11 @@ order by 1, 2
 
 **Exhibit 2.1 — Revenue by {inputs.grain}.** USD. The final period is partial.
 
-<LineChart data={trend} x=period y=revenue yFmt=usdacck
+<LiveQuery query={trend} title="Exhibit 2.1" let:data>
+<LineChart data={data} x=period y=revenue yFmt=usdacck
   subtitle="Source: queries/metrics/average_order_value.sql · dbt metric revenue · excludes cancelled orders"
   chartAreaHeight=280/>
+</LiveQuery>
 
 </PrintGroup>
 
@@ -206,27 +225,32 @@ order by 1, 2
 **Exhibit 2.2 — Revenue mix by region.** Percent of period total. Hues are pinned to the
 entity, so removing a region from the filter never repaints the remaining series.
 
-<AreaChart data={trend_mix} x=period y=revenue series=region type=stacked100
+<LiveQuery query={trend_mix} title="Exhibit 2.2" let:data>
+<AreaChart data={data} x=period y=revenue series=region type=stacked100
   subtitle="Source: queries/metrics/revenue.sql"
   chartAreaHeight=240
   seriesColors={{'EMEA':'#2a78d6','AMER':'#eb6834','OTHER':'#1baf7a','Guest checkout':'#eda100'}}/>
+</LiveQuery>
 
 </PrintGroup>
 
 **Table 2.3 — Revenue by region and {inputs.grain}.** USD. The values behind Exhibit 2.2,
 before the conversion to percent of period total.
 
-<DataTable data={trend_mix} rows=12 search=true
+<LiveQuery query={trend_mix} title="Table 2.3" let:data>
+<DataTable data={data} rows=12 search=true
   subtitle="Source: queries/metrics/revenue.sql">
   <Column id=period title="Period commencing" fmt=rptdate/>
   <Column id=region title="Region"/>
   <Column id=revenue title="Revenue" fmt=usdacc/>
 </DataTable>
+</LiveQuery>
 
 **Table 2.4 — Revenue by {inputs.grain}.** USD. Average order value is re-divided at the
 display grain, never averaged.
 
-<DataTable data={trend} totalRow=true
+<LiveQuery query={trend} title="Table 2.4" let:data>
+<DataTable data={data} totalRow=true
   subtitle="Source: queries/metrics/average_order_value.sql">
   <Column id=period title="Period commencing" fmt=rptdate/>
   <Column id=revenue title="Revenue" fmt=usdacc/>
@@ -234,6 +258,7 @@ display grain, never averaged.
   <Column id=average_order_value title="Average order value" fmt=usdacc2
     totalAgg=weightedMean weightCol=order_count/>
 </DataTable>
+</LiveQuery>
 
 <PageBreak/>
 
@@ -269,9 +294,11 @@ order by 3 desc
 excluded here. Weeks are built from daily rows already inside the selected period, so the
 first and last weeks are partial rather than overstated.
 
-<BarChart data={weekly} x=week y=revenue series=region type=stacked yFmt=usdacck
+<LiveQuery query={weekly} title="Exhibit 3.1" let:data>
+<BarChart data={data} x=week y=revenue series=region type=stacked yFmt=usdacck
   subtitle="Source: queries/metrics/revenue.sql · rolled up to week grain"
   seriesColors={{'EMEA':'#2a78d6','AMER':'#eb6834','OTHER':'#1baf7a'}}/>
+</LiveQuery>
 
 </PrintGroup>
 
@@ -280,9 +307,11 @@ first and last weeks are partial rather than overstated.
 **Exhibit 3.2 — Revenue by region and order state.** USD. Ribbon width is revenue.
 Cancelled orders are excluded by the metric definition and therefore cannot appear here.
 
-<SankeyDiagram data={flow} sourceCol=source targetCol=target valueCol=value
+<LiveQuery query={flow} title="Exhibit 3.2" let:data>
+<SankeyDiagram data={data} sourceCol=source targetCol=target valueCol=value
   valueFmt=usdacck linkColor=source nodeLabels=full chartAreaHeight=300
   subtitle="Source: queries/metrics/revenue_by_dimensions.sql"/>
+</LiveQuery>
 
 </PrintGroup>
 
@@ -339,7 +368,8 @@ order by c.revenue desc
 average order value rather than averaging the rows above them. Movements on fewer than
 10 orders are left blank (not meaningful).
 
-<DataTable data={detail} link=region_url groupBy=region subtotals=true totalRow=true
+<LiveQuery query={detail} title="Table 4.1" let:data>
+<DataTable data={data} link=region_url groupBy=region subtotals=true totalRow=true
   search=true rows=15 downloadable=true
   subtitle="Source: queries/metrics/revenue_by_dimensions.sql · click a row to drill into the region">
   <Column id=country_code title="Country"/>
@@ -350,6 +380,7 @@ average order value rather than averaging the rows above them. Movements on fewe
     totalAgg=weightedMean weightCol=order_count/>
   <Column id=revenue_variance title="vs prior period" fmt=pctacc contentType=delta/>
 </DataTable>
+</LiveQuery>
 
 <PageBreak/>
 

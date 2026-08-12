@@ -48,7 +48,8 @@ To rebuild the dbt project first: `REBUILD=1 ./scripts/sync-dbt.sh`
   concentration, chip-based cross-filtering with no SQL, a table with in-cell
   bars, deltas, colour scales and sparklines, and the governance trail from
   dbt YAML → compiled SQL → page.
-- **`/reports/revenue-performance` Order Revenue Performance** — the same figures as
+- **`/reports/revenue-performance` Order Revenue Performance** — every exhibit opens:
+  see [Live SQL](#live-sql--every-exhibit-opens). Otherwise the same figures as
   a management report rather than a dashboard: control block (report ID, period,
   data as-of, owner, classification), queried comparatives, accounting number
   formats (adverse values in parentheses), numbered exhibits each naming the
@@ -142,6 +143,55 @@ joined at all — is not, and neither is heterogeneous federation via an externa
 service such as WrenAI. A field whose table has no declared path to the view's
 primary table is reported rather than silently cross-joined, so the gap is
 visible rather than wrong.
+
+## Live SQL — every exhibit opens
+
+A published page is a claim, and the honest form of a claim is one the reader can
+check. Every exhibit on [`/reports/revenue-performance`](pages/reports/revenue-performance.md)
+carries an **Edit SQL** link: it shows the query *as executed* — metric references
+already resolved, inputs already substituted — and lets the reader change it and
+re-run against the same duckdb-wasm database the page uses. The exhibit redraws
+from the result.
+
+[`components/LiveQuery.svelte`](components/LiveQuery.svelte) wraps an exhibit
+rather than replacing it, so nothing about its design is spent on being live:
+
+```svelte
+<LiveQuery query={trend} title="Exhibit 2.1" let:data>
+    <LineChart data={data} x=period y=revenue yFmt=usdacck/>
+</LiveQuery>
+```
+
+The child is the same Evidence component with the same accounting formats,
+subtotals and print groups. Until someone presses Edit, `data` is the page's own
+result and the page is unchanged.
+
+- **Reads only.** DuckDB-wasm holds a private copy, but a stray `create` or
+  `drop` would silently affect every other exhibit for the rest of the session,
+  so the panel declines rather than letting a reader leave the page in a state
+  they cannot explain.
+- **Edited exhibits say so**, and are excluded from print. *Reset* — or a reload
+  — restores the published SQL.
+- **It changes nothing about governance.** What a number *means* is fixed in the
+  dbt semantic layer and in `queries/metrics/`; editing a query on the page is
+  the reader's arithmetic, not the report's.
+
+### The notebook's screen, made live
+
+[`/notebooks/order-anomalies`](pages/notebooks/order-anomalies.ipynb) renders
+committed cell outputs — Python never runs in the browser — so its two decisions,
+the history window and the flag threshold, were frozen into a printout taken
+against whatever data the notebook last saw.
+
+They are now controls. The screen is expressed a second time as a DuckDB query
+(day-of-week deseasonalization → trailing median → median-absolute-deviation
+score), so moving either control recomputes it in the browser against today's
+parquet, and both exhibits are `LiveQuery` panels like the report's.
+
+Stating one method twice is a liability unless something checks the two still
+agree, which is what `npm run test:screen` is for: it runs the SQL and an
+independent transcription of the notebook's pandas over the project's real
+parquet and requires them to match on every row, at every window the page offers.
 
 ## Studio — dashboards and reports, built at runtime
 
@@ -406,12 +456,15 @@ npm run test:noodle    # 37 assertions: spec -> SQL, LOD, table calcs, Show Me
 npm run test:dashboard # 29 assertions: filter composition, save/open, published SQL
 npm run test:notebook  # 44 assertions: serializer escaping + notebook compiler
 npm run test:cube      # 34 assertions + every generated SQL executed on Cube (needs cube/up.sh)
+npm run test:screen    # 12 assertions: the notebook's anomaly screen, in SQL and in pandas, agree
 npm run test:flint     # 12 assertions: palette, chrome, formats and the chart audit
 
 # Browser suites — need a server for the built site:
 #   npm run build && node tests/static-server.mjs build 4321
 npm run test:studio    # 26 assertions: cross-filter moves the other views, publish, print layout
 npm run test:gallery   # 10 assertions: every component on /gallery actually rendered
+npm run test:livequery # 20 checks: edit an exhibit's SQL, it redraws; writes refused; Reset restores
+npm run test:notebook:ui # 12 checks: the notebook's window/threshold controls recompute the screen
 npm run test:flint:ui  # 12 checks: every chart painted, in the project's hues, on the right surface
 ```
 

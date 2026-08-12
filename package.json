@@ -24,6 +24,9 @@
     "bench:layout": "node tests/bench-layout.mjs",
     "bench:openzl": "node tests/bench-openzl.mjs",
     "test:gallery": "node tests/t-gallery-ui.mjs",
+    "test:livequery": "node tests/t-livequery-ui.mjs",
+    "test:screen": "node tests/t-screen.mjs",
+    "test:notebook:ui": "node tests/t-notebook-ui.mjs",
     "test:flint": "node tests/t-flint.mjs",
     "test:flint:ui": "node tests/t-flint-ui.mjs",
     "dashboard:audit": "node scripts/dashboard-audit.mjs"
