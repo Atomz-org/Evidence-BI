@@ -78,11 +78,36 @@ the chart type and all of that still holds — which is the point of stating it 
 | `fmt` | Evidence format code for the measure |
 | `formats` | Per-channel override when x and y carry different units: `{{ x: 'num0', y: 'usd0k' }}` |
 | `title`, `subtitle` | Headline and deck. Rendered in the DOM, so they stay selectable |
-| `height` | Target plot height in px. Width is always the container's |
+| `height` | The height the chart gets, in px. Width is always the container's |
 | `grow` | Let Flint exceed `height` when the data is dense (default `true`) |
+| `fill` | Take whatever height the parent has left, measured rather than passed. Implies `grow=false` |
 | `properties` | Flint template properties: bar corner radius, opacity, showLabels |
 | `hasTable` | Declare that a companion `DataTable` is on the page — satisfies the relief rule |
+| `exportable` | The export menu, on by default. Turn it off when the host already has one in its own header |
+| `exportName` | Names the exported file; falls back to `title` |
 | `showAudit` | Print rule violations under the chart while building |
+
+### A chart in a fixed box
+
+On a page that scrolls, let Flint grow — that is what `grow` defaults to and it
+is right. On a dashboard tile whose row is 360px and will not negotiate, use
+`fill` and let the component measure:
+
+```svelte
+<FlintChart data={rows} chartType="Line Chart" x=bucket y=revenue fill />
+```
+
+`height` and `grow=false` together are the second-best version of this: the
+number is a subtraction the host has to keep correct, and it goes wrong the
+first time a subtitle wraps to a second line.
+
+Either way the chart no longer gets truncated to fit. `chart_spec.baseSize` is
+the **plot area** and `option._height` is the **canvas Flint planned around it**,
+and the difference — a fixed slab of chrome that no smaller ask removes — used
+to be simply cut off. `components/flint/layout-fit.js` recomputes the margins
+against the real box instead, measuring every label in the page's own font. It
+also lays flat any labels that fit, and drops an axis title that only repeats
+what its labels already say (a time axis titled "Date"; "Signup date" is kept).
 
 ## Colour is not Flint's
 
@@ -103,6 +128,11 @@ What this means when authoring:
   anywhere on the page. The audit fails a page that does.
 - **Never ask for a Flint theme preset.** It will be silently ignored, which is
   worse than an error because the chart still renders.
+- **`theme_spec` is ignored wholesale, not just its colours.** Its
+  `annotation.axisTitles`, `legend.placement` and `legend.direction` houses are
+  Vega-Lite-only too — the ECharts assembler returns a byte-identical option for
+  every value of them. Verified by sweeping each one and diffing the result. If
+  you need one of those behaviours, it goes in the bridge or the fitter.
 - **Above four series, fold or facet.** Eight slots exist; past four the legend
   outruns the reader. `column=`/`row=` is usually better than an "Other" bucket
   because it keeps every category visible.
@@ -117,7 +147,8 @@ the layout, not a layout override:
 | Symptom | The actual cause | Fix |
 |---------|------------------|-----|
 | Axis labels rotated 90°, chart very tall | Too many categories for the width | Aggregate to fewer categories, or facet |
-| Chart much bigger than `height` | Flint grew the canvas under pressure | Reduce the data's cardinality, or `grow=false` to cap it |
+| Chart much bigger than `height` | Flint grew the canvas under pressure | Reduce the data's cardinality, or `fill` to hold it to the box |
+| Axis title written through the axis labels; furniture below the plot floating in space | The chart was drawn shorter than the canvas Flint planned | `fill` (or `grow=false`), which routes it through the fitter |
 | Axis does not start at zero | Semantic type says zero is not meaningful (`Temperature`, `Score`, `Rank`) | Correct the type if the column really is an `Amount` |
 | Categories in the wrong order | Type has no inherent order | Use an ordinal type (`Month`, `Quarter`) or sort in SQL |
 | Dates read as strings | Column is a string and no type was given | `types={{ col: 'Date' }}` |

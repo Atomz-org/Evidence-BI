@@ -10,9 +10,46 @@ import { spawn } from 'node:child_process';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
+/**
+ * Shared, and deliberately so — see the note where it is passed to Chrome. The
+ * consequence to remember is that a profile is single-instance: one page at a
+ * time per machine, so a suite that wants two must close the first.
+ */
+const PROFILE = '/tmp/noodle-cdp-profile';
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export const openPage = async (url, { port = 9333, width = 1500, height = 1400 } = {}) => {
+/**
+ * A port nothing is listening on.
+ *
+ * A fixed debugging port is an attach-to-whatever-is-there instruction. When an
+ * earlier run leaves Chrome alive, the new `spawn` cannot bind, its launch URL
+ * is never visited, and this driver silently attaches to a browser still
+ * showing an old page. From the outside that is a suite passing against a build
+ * from several iterations ago — the DOM is stale while a `fetch()` from inside
+ * the same page returns the current document, a contradiction nobody thinks to
+ * check for. Found the hard way: a literal string put into a component could
+ * not be found in the DOM it was supposed to be rendering into.
+ *
+ * Binding the port here first means the browser under test is the one this
+ * process started.
+ */
+const freePort = async (start) => {
+	const net = await import('node:net');
+	for (let candidate = start; candidate < start + 200; candidate += 1) {
+		const free = await new Promise((resolve) => {
+			const probe = net.createServer();
+			probe.once('error', () => resolve(false));
+			probe.once('listening', () => probe.close(() => resolve(true)));
+			probe.listen(candidate, '127.0.0.1');
+		});
+		if (free) return candidate;
+	}
+	throw new Error(`no free debugging port near ${start}`);
+};
+
+export const openPage = async (url, { port, width = 1500, height = 1400, colorScheme = 'light' } = {}) => {
+	port ??= await freePort(9400 + (process.pid % 400));
 	const chrome = spawn(
 		CHROME,
 		[
@@ -22,7 +59,15 @@ export const openPage = async (url, { port = 9333, width = 1500, height = 1400 }
 			'--hide-scrollbars',
 			`--remote-debugging-port=${port}`,
 			`--window-size=${width},${height}`,
-			'--user-data-dir=/tmp/noodle-cdp-profile',
+			// Shared, and deliberately so. A throwaway profile per run looks tidier
+			// and is what stops Chrome restoring form state between runs — but a
+			// profile Chrome has never seen sends it into first-run work that
+			// replaces the tab this driver is attached to about eight seconds in.
+			// Every `evaluate` after that hangs forever, which reads as a slow test
+			// rather than a broken one. The staleness this was meant to solve was
+			// really the fixed-port attach above; with that fixed, one profile is
+			// correct.
+			`--user-data-dir=${PROFILE}`,
 			url
 		],
 		{ stdio: 'ignore' }
@@ -41,7 +86,24 @@ export const openPage = async (url, { port = 9333, width = 1500, height = 1400 }
 	}
 	if (!target) {
 		chrome.kill();
-		throw new Error('Chrome did not expose a page target');
+		// Nearly always the same cause, and the bare message sends people looking
+		// in the wrong place. The profile below is shared on purpose (see the
+		// comment on `--user-data-dir`) and a profile is single-instance, so a
+		// crashed earlier run — or a suite that opens a second page before
+		// closing the first — leaves a Chrome holding it and this one never
+		// starts.
+		const { existsSync, readlinkSync } = await import('node:fs');
+		let held = '';
+		try {
+			if (existsSync(`${PROFILE}/SingletonLock`)) held = ` — ${PROFILE}/SingletonLock is held by ${readlinkSync(`${PROFILE}/SingletonLock`)}`;
+		} catch {
+			/* no lock, or not a symlink on this platform */
+		}
+		throw new Error(
+			`Chrome did not expose a page target${held}. ` +
+				`If a previous run crashed: pkill -f "user-data-dir=${PROFILE}". ` +
+				`Two pages at once need the first closed first.`
+		);
 	}
 
 	const ws = new WebSocket(target.webSocketDebuggerUrl);
@@ -87,6 +149,35 @@ export const openPage = async (url, { port = 9333, width = 1500, height = 1400 }
 	await send('Runtime.enable');
 	await send('Page.enable');
 
+	// Pin the colour scheme.
+	//
+	// Evidence follows `prefers-color-scheme`, and several assertions in this
+	// suite are about which palette got drawn — "the light page did not draw the
+	// dark palette" cannot be evaluated on a machine that has just rolled over
+	// into dark mode. Without this the same commit passes in the afternoon and
+	// fails at three in the morning, which teaches everyone to ignore the suite.
+	// Tests that care about the other surface pass `colorScheme: 'dark'`.
+	await send('Emulation.setEmulatedMedia', {
+		features: [{ name: 'prefers-color-scheme', value: colorScheme }]
+	});
+
+	// Fail loudly if the page under the driver is not the page that was asked
+	// for. Chrome opens `about:blank` first and navigates a moment later, so this
+	// polls — but it does give up, because silently testing whatever happens to
+	// be loaded is the failure the free port above exists to prevent.
+	const wanted = url.split('#')[0];
+	let href = '';
+	for (let i = 0; i < 100; i += 1) {
+		const landed = await send('Runtime.evaluate', { expression: 'location.href', returnByValue: true });
+		href = String(landed.result?.value ?? '');
+		if (href.startsWith(wanted)) break;
+		await sleep(100);
+	}
+	if (!href.startsWith(wanted)) {
+		chrome.kill();
+		throw new Error(`the page under the driver is ${href || 'unknown'}, not ${url}`);
+	}
+
 	/** Evaluate an expression in the page and return its JSON value. */
 	const evaluate = async (expression) => {
 		const result = await send('Runtime.evaluate', {
@@ -102,9 +193,38 @@ export const openPage = async (url, { port = 9333, width = 1500, height = 1400 }
 		return result.result.value;
 	};
 
-	const screenshot = async (path) => {
-		const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
+	/**
+	 * A picture of the settled page.
+	 *
+	 * `captureBeyondViewport: true` is the obvious way to photograph a page
+	 * taller than the window, and it lies. Chrome re-lays the page out at its
+	 * full height to take the shot, every ResizeObserver fires, every chart
+	 * re-renders — and the capture happens during that, so the image shows a
+	 * transition no reader ever sees. Measured on this board: a bar chart whose
+	 * bars start at the axis (x=98) photographed with them starting at x=52, and
+	 * back to 98 a second and a half later. Reviewing that image is reviewing a
+	 * bug that does not exist, and worse, it hides the ones that do.
+	 *
+	 * So the viewport is enlarged deliberately, the page is given time to settle
+	 * into it, and then an ordinary capture — which perturbs nothing — is taken.
+	 */
+	const screenshot = async (path, { settle = 1400 } = {}) => {
 		const { writeFileSync } = await import('node:fs');
+		const metrics = await send('Page.getLayoutMetrics');
+		const full = metrics.cssContentSize ?? metrics.contentSize;
+		let resized = false;
+		if (full?.height) {
+			await send('Emulation.setDeviceMetricsOverride', {
+				width: Math.ceil(full.width),
+				height: Math.ceil(full.height),
+				deviceScaleFactor: 1,
+				mobile: false
+			});
+			resized = true;
+			await sleep(settle);
+		}
+		const { data } = await send('Page.captureScreenshot', { format: 'png' });
+		if (resized) await send('Emulation.clearDeviceMetricsOverride');
 		writeFileSync(path, Buffer.from(data, 'base64'));
 	};
 

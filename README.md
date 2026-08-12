@@ -18,6 +18,12 @@ sources/dbt_semantic/*.sql                extract marts (orders, customers, time
 queries/metrics/<metric>.sql              the COMPILED semantic layer — one file per dbt metric
 queries/saved/<name>.sql                  compiled dbt saved_queries
 pages/*.md                                dashboards: filter + aggregate + render only
+
+rill/metrics/*.yaml                       a Rill metrics view over the same marts
+rill/explores/*.yaml                      which of its fields are on which dashboard
+        │  scripts/build-rill-model.mjs
+        ▼
+components/rill/model.generated.js        the same definitions, compiled for the browser
 ```
 
 Pages never restate business logic. If a dashboard needs a number that doesn't
@@ -48,6 +54,18 @@ To rebuild the dbt project first: `REBUILD=1 ./scripts/sync-dbt.sh`
   concentration, chip-based cross-filtering with no SQL, a table with in-cell
   bars, deltas, colour scales and sparklines, and the governance trail from
   dbt YAML → compiled SQL → page.
+- **`/canvas` One Dashboard** — every tool in the project on one board over one
+  governed metrics view: a Rill canvas layout, flint-chart for every chart, a
+  Cube-style pivot whose totals are computed rather than added, Rill
+  leaderboards that cross-filter, and one notebook cell that inherits the
+  board's window and is explicitly not governed. Defined in
+  `canvas/executive.yaml`.
+- **`/rill` Explore (Rill)** — a Rill metrics view and explore dashboard,
+  defined in `rill/` in Rill's own YAML schema and rendered here without a Rill
+  server: a data-anchored time range with the window before it, measure cards
+  carrying their change, ranked dimension leaderboards that cross-filter, and
+  expand-by-dimension. Below it, the same metrics view driving a noodle
+  worksheet.
 - **`/reports/revenue-performance` Order Revenue Performance** — every exhibit opens:
   see [Live SQL](#live-sql--every-exhibit-opens). Otherwise the same figures as
   a management report rather than a dashboard: control block (report ID, period,
@@ -69,11 +87,6 @@ To rebuild the dbt project first: `REBUILD=1 ./scripts/sync-dbt.sh`
   [Studio](#studio--dashboards-and-reports-built-at-runtime).
 - **`/gallery`** — the component set and the layout system, each shown working
   on real data.
-- **`/flint` Flint Charting** — the semantic charting path. `<FlintChart>` takes
-  the columns' *meaning* (`Amount`, `Region`, `Date`) and lets
-  [flint-chart](https://github.com/PackMaaan/flint-chart) derive the layout —
-  axis steps, label rotation, legend placement, when to wrap into facets. See
-  [Flint charting](#flint-charting).
 - **`/notebooks/order-anomalies` Revenue Anomaly Detection** — authored as a
   Jupyter notebook (`pages/notebooks/order-anomalies.ipynb`), not markdown. A
   pandas screen over the governed `revenue` metric, on one page with SQL KPIs
@@ -192,6 +205,150 @@ Stating one method twice is a liability unless something checks the two still
 agree, which is what `npm run test:screen` is for: it runs the SQL and an
 independent transcription of the notebook's pandas over the project's real
 parquet and requires them to match on every row, at every window the page offers.
+
+## Rill — the dashboard as a file
+
+[Rill](https://github.com/rilldata/rill)'s idea is that a dashboard is a file: a
+metrics view declares dimensions and measures, an explore declares which of them
+are on the board, and the tool renders exactly that. `rill/` is a real Rill
+project in Rill's schema — `rill start rill/` renders it — and `/rill` renders
+the same YAML with no Rill process running.
+
+```
+rill/models/orders_enriched.sql     read_parquet(...) — resolved two ways
+rill/metrics/orders_metrics.yaml    7 measures, 4 dimensions, one timeseries
+rill/explores/revenue.yaml          the board, its ranges, what it opens on
+```
+
+The model's `read_parquet('data/<source>/<table>/<table>.parquet')` calls are
+what make one file serve both: Rill resolves them against `./data`, and
+`scripts/build-rill-model.mjs` rewrites them to the tables Evidence has already
+registered in duckdb-wasm. The join grain and column list cannot differ between
+the two renderings, because there is only one of them.
+
+**Three things it brings that nothing else here did.**
+
+*A window and the window before it.* Every measure is shown with its change,
+anchored to the newest row in the data rather than to the clock — this project's
+parquet ends 4 August 2026, and a "last 7 days" measured from today would open
+on an empty chart. Where the prior window runs off the start of the data the
+page says how much of it is real, rather than letting a 64%-full period read as
+growth.
+
+*Leaderboards that cross-filter.* Clicking a value filters every panel; the board
+you clicked keeps its other values, so you can add a second without clearing the
+first blind. `−` excludes instead.
+
+*Expand by dimension.* One measure, split into a line per dimension value — where
+"revenue is up" becomes "revenue is up in one region".
+
+**What the generator enforces.** Rill's loader checks the YAML; it cannot check
+whether a measure claiming `valid_percent_of_total` can actually be summed across
+a partition, and that claim is what draws a "% of total" column. A distinct count
+cannot (one customer, two regions) and neither can a ratio (the average of
+averages is not the average). The generator refuses to compile either, so the
+leaderboards show a share only where a share means something — and say so in the
+footer where they don't.
+
+**Governed measures reach the worksheet.** A catalog field may now carry
+`aggExpression`, an aggregate the semantic layer owns, and the noodle compiler
+emits it verbatim. Dragging *Average order value* onto a shelf produces
+`sum(order_amount_usd) / nullif(count(*), 0)` — the metrics view's expression,
+not a re-derivation of it. The aggregation menu is closed for those fields and
+says why, for Cube's measures as well as Rill's, and a level-of-detail
+expression over one is refused rather than silently returning an average of
+averages.
+
+```svelte
+<RillExplore explore="revenue"/>
+<Noodle rill={{ explore: 'revenue' }}/>
+```
+
+**Where it stops.** `security:` (row-level policies) parses and does nothing —
+a static site has no user to enforce against, and a filter applied in the browser
+is not a security control. Pivot mode, dimension-vs-dimension comparison, alerts,
+scheduled reports and themes are Rill-only. `rill/README.md` has the full list.
+
+**Why the panels don't open.** Every panel shows the SQL it ran and none of them
+let you edit it, which is the opposite of the rule one section above. A report is
+an argument and a reader should be able to check it; a governed measure's whole
+value is meaning one thing everywhere. So it is inspectable everywhere and
+editable nowhere, and the escape hatch under the board hands the same window to
+LiveQuery where an edit is plainly the reader's own.
+
+## One board — where the five tools stop being five tools
+
+`/canvas` is the whole project on a single page, defined by `canvas/executive.yaml`.
+
+```
+dbt          the marts, and the rule that a measure is defined once
+Rill         the canvas grammar, the window and the window before it,
+             kpi_grid, leaderboards, cross-filtering
+flint-chart  every chart — semantic types, not chart configuration
+Cube         the pivot: rows x columns x measures, with real totals
+notebooks    one cell whose SQL the reader can run
+```
+
+The layout uses Rill's canvas grammar — rows of items, twelve columns, one
+component per item. Three component types carry an `x_` prefix because Rill does
+not have them (`x_leaderboard`, `x_pivot`, `x_notebook`), so reading the file
+tells you which ideas are Rill's and which are this project's. `rill/` next door
+stays a pure Rill project.
+
+**The point is the shared scan.** Click a region on a leaderboard and the KPI
+row, both charts, the pivot, the table and the notebook cell all narrow — they
+read one filtered scan of one view. Five tools that each own their filter state
+are five dashboards on one page, and the reader is the one left to notice they
+disagree. `tests/t-canvas-ui.mjs` asserts exactly this: one click, and a count
+of what moved.
+
+**Charts are typed, not configured.** flint-chart derives axis steps, zero
+baselines, label rotation and faceting from what a column *means*. Those
+meanings come from the metrics view — `Amount` because the measure declares
+`format_preset: currency_usd` — so typing a measure once gives every chart of it
+a zero baseline, and a temperature would not get one. The generator refuses a
+semantic type flint does not register, because an unknown type is silently
+ignored rather than rejected.
+
+**The pivot's totals are computed, never added.** A total row under *Average
+order value* is not the sum of the cells and not their mean; it is the measure's
+own expression over the whole slice. On this data the difference is ~1.3% —
+small enough to survive review, large enough to be wrong. One `GROUPING SETS`
+query returns cells, row totals, column totals and the grand total, each at its
+own grain:
+
+```sql
+group by grouping sets ((region, status), (region), (status), ())
+--                       cells            row       column    grand
+```
+
+The test for this does not check that the totals look right. It checks that the
+computed total *differs* from what adding the cells would give, and separately
+that an additive measure still agrees — a pivot that summed everything would
+pass the first check on revenue alone.
+
+**One tile is not governed, and says so.** Every compiled tile shows its SQL and
+refuses to let you edit it. The notebook cell starts from the board's window and
+filters — `{{scan}}` in the layout file is substituted with them — and is then
+the reader's own.
+
+### Two defects this shook out
+
+*A chart that can resize its own container is a loop.* Flint grows its canvas
+when the data is dense; in a grid row whose height is content-driven, that
+growth resizes the container, which re-fires the chart's `ResizeObserver`. The
+page never settles and the main thread never yields, which presents as a browser
+test that hangs rather than as a visibly broken page. Chart rows now have fixed
+heights and pass `grow={false}`.
+
+*The browser suite was testing stale builds.* `tests/cdp.mjs` launched Chrome on
+a fixed debugging port. When an earlier run left Chrome alive, the new process
+could not bind, its launch URL was never visited, and the driver attached to a
+browser still showing an old page — reporting the DOM of a build several
+iterations old while a `fetch()` from inside that same page returned the current
+document. It now binds a free port before spawning, uses a throwaway profile,
+disables the HTTP cache, and fails loudly if the page under the driver is not
+the page that was asked for.
 
 ## Studio — dashboards and reports, built at runtime
 
@@ -313,63 +470,10 @@ plain HTML such as a pandas repr is injected directly; tracebacks are
 ANSI-stripped. Save figures transparent (`savefig(..., transparent=True)`) so they
 sit on both the light and dark surface.
 
-## Flint charting
+## The skill
 
-`<FlintChart>` ([`components/FlintChart.svelte`](components/FlintChart.svelte)) is
-the semantic path to a chart. Evidence's own components are right when the form
-is already decided — `<LineChart>` draws a line and you tune the rest by hand.
-Flint answers the other question: hand it the columns and what they **mean**, and
-it derives the layout.
-
-```svelte
-<FlintChart
-    data={weekly}
-    chartType="Line Chart"
-    x=week y=revenue series=region
-    types={{ week: 'Date', region: 'Region', revenue: 'Amount' }}
-    fmt=usd0k
-    title="Weekly revenue by region"
-    subtitle="USD, excludes cancelled orders"
-/>
-```
-
-`Amount` says money, so zero is a meaningful baseline and the axis starts there.
-`Region` says place, so the values are categorical. `Date` says time, so the tick
-format follows the span. Change only `chartType` and all of that still holds.
-
-Division of labour:
-
-| Layer | Owns |
-|-------|------|
-| [flint-chart](https://github.com/PackMaaan/flint-chart) `assembleECharts` | Structure — mark, scales, axis steps, label rotation, faceting, overflow |
-| [`components/flint/theme-bridge.js`](components/flint/theme-bridge.js) | Ink — the validated palette, chrome, fonts, Evidence number formats |
-| [`components/FlintChart.svelte`](components/FlintChart.svelte) | Data, responsiveness, theme switching, failing loudly |
-
-**Colour is not Flint's.** Its ten `theme_spec` houses (economist, swiss, nature,
-…) are realized by the Vega-Lite assembler only — the ECharts assembler accepts
-the field and ignores it, so an option arrives wearing stock ECharts hues that
-are not CVD-checked against this project's surfaces. The bridge re-inks every
-option from `evidence.config.yaml` before it is drawn, keeping series *n* on
-palette slot *n* because slot order is the CVD-safety mechanism.
-
-Flint is a chart compiler, not a data layer: reshape in the query block, which in
-this project means starting from a metric in `queries/metrics/`.
-
-```bash
-npm run test:flint          # asserts the palette, chrome and formats reach the option
-npm run dashboard:audit     # scores every page against the design contract
-```
-
-37 chart types, 44 semantic types, and worked recipes are catalogued in
-`.claude/skills/flint-chart/`. Live examples: [`/flint`](pages/flint.md).
-
-## The skills
-
-`.claude/skills/` loads automatically for Claude sessions in this project.
-
-### `evidence-bi` — the standard
-
-Encodes:
+`.claude/skills/evidence-bi/` loads automatically for Claude sessions in this
+project and encodes:
 
 - `SKILL.md` — the metric-first procedure and non-negotiables
 - `references/design-principles.md` — form choice, page anatomy, the color
@@ -386,31 +490,6 @@ The chart palettes in `evidence.config.yaml` pass all six checks of the dataviz
 color validator (lightness band, chroma floor, CVD ΔE ≥ 8, normal-vision
 ΔE ≥ 15, contrast) on this project's real surfaces in both light and dark mode.
 
-### `flint-chart` — authoring a chart
-
-The 37-template catalog with the channels each accepts, all 44 semantic types
-with what each implies, working recipes per job, and the anti-patterns. Both
-reference files are generated from the installed library, with the regeneration
-command at the top.
-
-### `dashboard-loop` — finishing one
-
-The cycle that terminates: frame → draft → score → critique → fix one thing →
-repeat. `npm run dashboard:audit` scores a page against the non-negotiables
-mechanically (`100 − 3×errors − warnings`), so passes are comparable; seven fixed
-critique questions cover what a rule cannot see. Exit is zero errors, all seven
-questions passing, and a green build.
-
-```bash
-npm run dashboard:audit -- pages/index.md    # one page
-npm run dashboard:audit -- --json            # diff between passes
-```
-
-A page can opt out of a rule it genuinely does not apply to with
-`<!-- audit-ignore: rule-id -->`. It names rules individually; there is no "all".
-`references/rubric.md` documents every rule and its fix;
-`references/worked-example.md` is a real trace from 76/100 to clean.
-
 ## Data sources
 
 All Evidence connectors are installed and enabled (`evidence.config.yaml`):
@@ -424,18 +503,37 @@ unchanged.
 `sources/needful_things/` is the stock Evidence demo source (unused by the
 dashboards; kept for experiments).
 
-If SQLite complains about a missing native binding after install
-(`Cannot find module .../napi-v6-darwin-unknown-arm64/node_sqlite3.node`, which
-fails *all* of `evidence sources`, not just SQLite):
+If SQLite complains about a missing native binding after install:
+`cd node_modules/sqlite3 && npm run install` (fetches the prebuilt binary).
+
+## Deploying
+
+`deploy/` runs this whole project on one 2 GB server with nothing hosted
+elsewhere — no managed database, no hosted semantic layer, no object store, no
+CDN — and without dropping a page, a connector or a surface.
+
+The site is static and on every page but one the queries run in the reader's
+browser on duckdb-wasm, so serving costs ~20 MB and ten readers cost the same as
+one. The exception is `/noodle-cube`, which is genuinely live: it calls
+`/cubejs-api` on its own origin, the web server proxies that to Cube on loopback
+(`deploy/Caddyfile`, `deploy/nginx.conf`), and with no Cube behind that proxy the
+page has no query engine — it refuses to fall back to ungoverned SQL rather than
+show a wrong number. `deploy/install.sh` provisions Cube natively and enables
+`evidence-cube.service`; a server that skips it serves every other page fine and
+`/noodle-cube` not at all. Cube is the only always-on process besides the web
+server — `/rill` compiles `rill/` to duckdb-wasm and needs no Rill running, and
+every other page is parquet in the browser. The whole problem
+is the *build*: measured cold, it needs >1792 MB of JavaScript heap and peaks
+near 2.8 GB, and Node's heap default is sized from visible RAM so on a 2 GB box
+it dies before swap is ever reached. `deploy/README.md` has the measurements and
+the two ways out — ship the built artifact from your own machine
+(`deploy/publish.sh`), or build on the server with zram and exclusive
+sequencing (`deploy/build.sh`).
 
 ```bash
-cd node_modules/sqlite3 && npx --no-install node-pre-gyp install --fallback-to-build
+sudo deploy/install.sh          # provision a fresh 2 GB Debian/Ubuntu box
+deploy/publish.sh user@server   # or: build here, ship the artifact
 ```
-
-`npm rebuild sqlite3` will not fix it and exits reporting success: a global
-`allow-scripts` allowlist in `~/.npmrc` suppresses sqlite3's install hook, so the
-prebuilt binary is never fetched. Add `sqlite3` to that list to make it stick
-across reinstalls.
 
 ## Commands
 
@@ -446,18 +544,26 @@ npm run build          # production build (fails on broken queries — the CI ga
 npm run preview        # preview the production build
 npm run notebooks      # re-apply the native-notebook core patch (also runs on postinstall)
 
-npm run dashboard:audit          # score every page against the design contract
-npm run dashboard:audit -- pages/index.md --json
-
 ./cube/up.sh           # local Cube over this project's parquet (./cube/up.sh down to stop)
 npm run cube:up        # same, via docker compose where a Docker daemon is available
+
+npm run rill:model     # compile rill/ -> components/rill/model.generated.js (also on postinstall)
+./rill/up.sh           # the real Rill over the same parquet, at localhost:9009
 
 npm run test:noodle    # 37 assertions: spec -> SQL, LOD, table calcs, Show Me
 npm run test:dashboard # 29 assertions: filter composition, save/open, published SQL
 npm run test:notebook  # 44 assertions: serializer escaping + notebook compiler
 npm run test:cube      # 34 assertions + every generated SQL executed on Cube (needs cube/up.sh)
 npm run test:screen    # 12 assertions: the notebook's anomaly screen, in SQL and in pandas, agree
-npm run test:flint     # 12 assertions: palette, chrome, formats and the chart audit
+npm run test:rill      # 33 assertions: every Rill measure vs an independent control, 5 timezones
+npm run test:canvas    # 22 assertions: pivot totals vs controls, layout validation, semantic types
+npm run test:flint     # 14 assertions: flint assembly, the palette bridge, the option audit
+npm run dashboard:audit # 10 rules over every page — scores the pages, not the code
+
+sudo deploy/install.sh          # provision a 2 GB server (deploy/README.md)
+deploy/build.sh                 # rebuild on the server, sequenced to fit
+deploy/publish.sh user@server   # build locally, ship the artifact, flip the symlink
+deploy/precompress.sh build     # brotli the output: 90 MB -> 13 MB, once
 
 # Browser suites — need a server for the built site:
 #   npm run build && node tests/static-server.mjs build 4321
@@ -465,7 +571,9 @@ npm run test:studio    # 26 assertions: cross-filter moves the other views, publ
 npm run test:gallery   # 10 assertions: every component on /gallery actually rendered
 npm run test:livequery # 20 checks: edit an exhibit's SQL, it redraws; writes refused; Reset restores
 npm run test:notebook:ui # 12 checks: the notebook's window/threshold controls recompute the screen
-npm run test:flint:ui  # 12 checks: every chart painted, in the project's hues, on the right surface
+npm run test:rill:ui   # 30 checks: cross-filter, comparison toggle, share withdrawn for a ratio
+npm run test:canvas:ui # 23 checks: one click moves every tile; pivot shelves; governed vs not
+npm run test:flint:ui  # 12 checks: every FlintChart on /flint actually painted
 ```
 
 The tests are execution-based rather than snapshot-based: generated SQL is run

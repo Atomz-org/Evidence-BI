@@ -25,6 +25,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import ExportMenu from './ExportMenu.svelte';
 
 	/**
 	 * The page query this exhibit is built on. Its `.text` is the SQL as executed
@@ -79,7 +80,8 @@
 	// Until the reader runs something, the exhibit shows the page's own data. This
 	// is the whole safety property: opening the panel changes nothing.
 	$: data = liveRows ?? pageRows;
-	$: edited = liveRows !== null;
+	let ranByReader = false;
+	$: edited = liveRows !== null && ranByReader;
 	$: dirty = editorText.trim() !== published;
 
 	onMount(async () => {
@@ -123,7 +125,13 @@
 		return null;
 	};
 
-	const run = async () => {
+	/**
+	 * @param {{auto?: boolean}} [options] `auto` marks the first run of a
+	 *   detached panel, which is that panel's published state rather than
+	 *   something the reader did — badging it "edited" would be a lie about
+	 *   provenance on a tile the reader has not touched.
+	 */
+	const run = async (options = {}) => {
 		if (!runner) return;
 		const refusal = readOnly(editorText);
 		if (refusal) {
@@ -133,6 +141,7 @@
 
 		running = true;
 		error = null;
+		ranByReader = !options.auto;
 		const started = performance.now();
 		try {
 			const result = await runner(editorText);
@@ -147,11 +156,31 @@
 		}
 	};
 
+	/**
+	 * A panel with no page query behind it starts empty.
+	 *
+	 * When `query` is set, the exhibit is already on the page and opening the
+	 * editor must change nothing — that is the whole safety property. A panel
+	 * given only `sql` has no such exhibit: it would sit there showing "0 rows"
+	 * until someone pressed Run, which reads as broken rather than as waiting.
+	 * So a detached panel runs its own SQL once, and only once — after that the
+	 * reader owns it.
+	 */
+	let autoRan = false;
+	$: if (runner && !query && published && !autoRan && !touched) {
+		autoRan = true;
+		run({ auto: true });
+	}
+
 	/** Back to the SQL the report publishes, and to the page's own numbers. */
 	const reset = () => {
 		editorText = published;
 		touched = false;
 		liveRows = null;
+		// A detached panel's "published" state is its own first run, so restore
+		// that rather than an empty table.
+		if (!query) autoRan = false;
+		ranByReader = false;
 		error = null;
 		elapsed = null;
 		ranAt = null;
@@ -179,6 +208,8 @@
 			<span class="badge">edited — not the published figure</span>
 		{/if}
 		<span class="count">{data.length.toLocaleString()} rows</span>
+		<!-- Whatever is on screen, edited or published — the badge beside it says which. -->
+		<ExportMenu rows={data} name={title ?? 'query'} compact />
 	</div>
 
 	{#if editorOpen}

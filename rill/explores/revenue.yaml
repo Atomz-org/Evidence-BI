@@ -1,0 +1,38 @@
+# The dashboard. Which of the metrics view's fields are on it, what it opens on.
+#
+# An explore is deliberately thin: it selects from the metrics view and sets an
+# initial state. It cannot define a measure, which is the point — a dashboard
+# that could redefine revenue would be a second place revenue is defined.
+type: explore
+
+display_name: Revenue explore
+description: >
+  Where revenue came from in the selected window, and what moved against the
+  window before it.
+
+metrics_view: orders_metrics
+
+dimensions: '*'
+measures: '*'
+
+# Anchored to the newest row in the data, not to wall-clock now — see
+# components/rill/engine/timerange.js. A demo dataset that stopped last week
+# would otherwise open on an empty "last 7 days".
+time_ranges:
+  - P7D
+  - P14D
+  - P4W
+  - P3M
+  - inf
+
+defaults:
+  measures:
+    - revenue
+    - orders
+    - avg_order_value
+  dimensions:
+    - region
+    - order_status
+    - country_code
+  time_range: P4W
+  comparison_mode: time

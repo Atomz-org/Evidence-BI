@@ -20,12 +20,7 @@ const checks = [];
 const check = (name, ok, detail = '') => checks.push([name, !!ok, detail]);
 
 const page = await openPage(URL, { width: 1500, height: 3200 });
-
-// A thrown evaluate below would otherwise skip page.close() and leave Chrome
-// running. cdp.mjs reuses one single-instance profile, so the leaked browser
-// keeps the lock and it is the NEXT suite that fails to launch, a long way
-// from the assertion that actually broke.
-let failed = [];
+let lightConsole = [];
 try {
 	await page.sleep(9000); // duckdb-wasm boot, then every query on the page
 
@@ -119,25 +114,112 @@ try {
 		state.audit.join(', ') || 'nothing reported'
 	);
 
+	/*
+	 * The export belongs to the chart component, not to the board — a chart dropped
+	 * on any page carries its own way out, and a host with its own header turns it
+	 * off rather than reimplementing it.
+	 */
+	const exports = await page.evaluate(`
+	  const triggers = [...document.querySelectorAll('figure.flint [aria-haspopup="menu"]')];
+	  const charts = document.querySelectorAll('figure.flint').length;
+	  triggers[0] && triggers[0].click();
+	  await new Promise(r => setTimeout(r, 120));
+	  const items = [...document.querySelectorAll('[role="menuitem"] strong')].map(s => s.textContent.trim());
+	  return { charts, triggers: triggers.length, items };
+	`);
+	check(
+		'every chart on the page carries its own export',
+		exports.triggers === exports.charts && exports.charts >= 5,
+		`${exports.triggers} of ${exports.charts} charts`
+	);
+	check(
+		'and offers the same three ways out as every tile on the board',
+		exports.items.join(' | ') === 'Google Sheets | Copy as TSV | Download CSV',
+		exports.items.join(' | ') || 'the menu did not open'
+	);
+
 	const crashes = page.pageErrors.filter((e) => !/favicon|ResizeObserver loop/i.test(e));
 	check('no uncaught exception', crashes.length === 0, crashes.slice(0, 2).join(' | '));
-
-	/* ------------------------------------------------------------------- report -- */
-
-	failed = checks.filter(([, ok]) => !ok);
-	for (const [name, ok, detail] of checks) {
-		console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
-	}
-	console.log(`\n${checks.length - failed.length} passed, ${failed.length} failed`);
-
-	if (failed.length) {
-		await page.screenshot('/tmp/flint-ui-failure.png');
-		console.log('screenshot: /tmp/flint-ui-failure.png');
-		for (const line of page.consoleLines.slice(-15)) console.log(`  ${line}`);
-	}
-
 } finally {
+	// From `finally` because a thrown `evaluate` above would otherwise leave this
+	// Chrome holding the shared profile — the next run then cannot start, or
+	// worse, attaches to this stale page and grades a build nobody made.
+	lightConsole = [...page.consoleLines];
+	if (checks.some(([, ok]) => !ok)) await page.screenshot('/tmp/flint-ui-failure.png').catch(() => {});
 	page.close();
+}
+
+/* ------------------------------------------------------------- the other surface -- */
+
+/*
+ * A second page, on the dark surface, for one thing the light one cannot show.
+ *
+ * Evidence's grey ramp does not flip: `--grey-900` is #111827 on both surfaces.
+ * A chart title painted from it is invisible in dark mode at about 1.1:1, and
+ * it shipped that way — legible in every screenshot anyone took, because
+ * everyone took them in light mode.
+ *
+ * Sequentially, not side by side: the driver shares one Chrome profile
+ * deliberately (a cold one sends Chrome into first-run work that replaces the
+ * tab under the driver), and a profile is single-instance. So the light page is
+ * photographed if it has anything to say, and then closed.
+ */
+const dark = await openPage(URL, { width: 1400, height: 2200, colorScheme: 'dark' });
+try {
+	await dark.sleep(9000);
+
+	const contrast = await dark.evaluate(`
+	  const luminance = (colour) => {
+	    const [r, g, b] = colour.match(/[\\d.]+/g).slice(0, 3).map(Number).map((c) => {
+	      const s = c / 255;
+	      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+	    });
+	    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+	  };
+	  // The surface is whichever ancestor actually paints; figures are transparent.
+	  const painted = (el) => {
+	    for (let n = el; n; n = n.parentElement) {
+	      const bg = getComputedStyle(n).backgroundColor;
+	      const alpha = Number((bg.match(/[\\d.]+/g) || [])[3] ?? 1);
+	      if (alpha > 0) return bg;
+	    }
+	    return 'rgb(255,255,255)';
+	  };
+	  const ratio = (fg, bg) => {
+	    const a = luminance(fg), b = luminance(bg);
+	    return Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 10) / 10;
+	  };
+	  return [...document.querySelectorAll('.flint-title')].map((t) => ({
+	    text: t.textContent.trim().slice(0, 22),
+	    ratio: ratio(getComputedStyle(t).color, painted(t))
+	  }));
+	`);
+
+	check(
+		'every chart headline is readable on the dark surface',
+		contrast.length > 0 && contrast.every((c) => c.ratio >= 4.5),
+		contrast.map((c) => `${c.text} ${c.ratio}:1`).join(' | ')
+	);
+
+	const darkCrashes = dark.pageErrors.filter((e) => !/favicon|ResizeObserver loop/i.test(e));
+	check('no uncaught exception on the dark surface', darkCrashes.length === 0, darkCrashes.slice(0, 2).join(' | '));
+} finally {
+	// Same reason as the light page: a failed assertion must not cost the next run
+	// its browser.
+	dark.close();
+}
+
+/* ------------------------------------------------------------------- report -- */
+
+const failed = checks.filter(([, ok]) => !ok);
+for (const [name, ok, detail] of checks) {
+	console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
+}
+console.log(`\n${checks.length - failed.length} passed, ${failed.length} failed`);
+
+if (failed.length) {
+	console.log('screenshot: /tmp/flint-ui-failure.png (taken while the light page was still up)');
+	for (const line of lightConsole.slice(-15)) console.log(`  ${line}`);
 }
 
 process.exit(failed.length ? 1 : 0);

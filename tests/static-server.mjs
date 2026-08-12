@@ -18,6 +18,36 @@ const TYPES = {
 	'.arrow': 'application/octet-stream'
 };
 
+/**
+ * Cube, same-origin — the topology the deployment actually uses.
+ *
+ * The pages ask for `/cubejs-api/v1/...` relative to themselves, and a real
+ * server reverse-proxies that to Cube on loopback (deploy/Caddyfile). Doing the
+ * same here means the browser suites exercise the arrangement that ships,
+ * rather than one that only works because a hard-coded `http://localhost:4000`
+ * happened to be the developer's own machine.
+ */
+const CUBE_ORIGIN = process.env.CUBE_ORIGIN ?? 'http://127.0.0.1:4000';
+
+const proxyToCube = (req, res) => {
+	const target = new URL(req.url, CUBE_ORIGIN);
+	const upstream = http.request(
+		target,
+		{ method: req.method, headers: { ...req.headers, host: target.host } },
+		(up) => {
+			res.writeHead(up.statusCode ?? 502, up.headers);
+			up.pipe(res);
+		}
+	);
+	upstream.on('error', (e) => {
+		// Cube not running is a normal state for most suites; answer in Cube's
+		// own error shape so the page reports it rather than throwing on JSON.
+		res.writeHead(502, { 'content-type': 'application/json' });
+		res.end(JSON.stringify({ error: `cube unreachable at ${CUBE_ORIGIN}: ${e.message}` }));
+	});
+	req.pipe(upstream);
+};
+
 http
 	.createServer((req, res) => {
 		try {
@@ -25,6 +55,9 @@ http
 			// malformed escape like `%zz`, and an uncaught throw in a request
 			// handler kills the process — one bad request would end the run.
 			const url = decodeURIComponent(req.url.split('?')[0]);
+
+			if (url.startsWith('/cubejs-api/')) return proxyToCube(req, res);
+
 			// Resolving the target as relative keeps `..` from escaping ROOT the
 			// way `path.join(ROOT, '/../../etc/passwd')` would.
 			let file = path.resolve(ROOT, `.${path.posix.normalize(url)}`);

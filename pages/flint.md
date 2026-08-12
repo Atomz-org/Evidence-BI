@@ -6,7 +6,7 @@ queries:
 ---
 
 `<FlintChart>` describes a chart by what the data **means** — `Amount`, `Region`,
-`Date` — and lets [Flint](https://github.com/PackMaaan/flint-chart) derive the
+`Date` — and lets [Flint](https://github.com/microsoft/flint-chart) derive the
 layout: axis steps, label rotation, legend placement, when a dense axis has to
 wrap into facets, how much canvas the whole thing needs. Colour is **not** Flint's:
 every chart below is re-inked from the validated palette in `evidence.config.yaml`
@@ -117,7 +117,9 @@ x-axis title across the bottom. Nothing here says how many panels there are.
 ## The table is always reachable
 
 Every chart above reads from one of these two result sets. A chart nobody can
-check is a claim, not a number.
+check is a claim, not a number. The ⇪ in each chart's header is the other half
+of that: the rows behind *that* chart, into a spreadsheet, without re-running
+anything by hand.
 
 <DataTable data={weekly} rows=12 search=true>
     <Column id=week fmt="mmm d, yyyy" title="Week"/>

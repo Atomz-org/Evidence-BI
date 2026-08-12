@@ -384,6 +384,24 @@ export const toCubeSql = (catalog, spec) => {
 	const cubeOf = (memberId) => memberId.split('.')[0];
 	const quote = (name) => `"${String(name).replace(/"/g, '""')}"`;
 
+	// `datePart` reaches here from a spec, and a spec is deserialized from
+	// localStorage or hand-authored in a `starter=` block — untrusted input that
+	// lands inside a SQL string literal. It is checked against the granularities
+	// the field itself declares rather than a fixed list, because a Cube model
+	// may add its own on top of CUBE_GRANULARITIES and those are legitimate.
+	// A rejected value is reported, not silently swapped: quietly answering at a
+	// different grain would be a wrong number wearing the right label.
+	const granularityFor = (column) => {
+		const requested = column.pill.datePart;
+		if (!requested) return 'month';
+		const allowed = catalog.byId?.[column.pill.fieldId]?.granularities ?? CUBE_GRANULARITIES;
+		if (allowed.includes(requested)) return requested;
+		warnings.push(
+			`${column.pill.fieldId}: unknown granularity "${requested}" — grouped by month instead.`
+		);
+		return 'month';
+	};
+
 	for (const column of columns) {
 		const memberId = column.pill.fieldId;
 		usedCubes.add(cubeOf(memberId));
@@ -393,7 +411,7 @@ export const toCubeSql = (catalog, spec) => {
 		if (column.role === 'measure') {
 			selects.push(`MEASURE(${ref}) as ${quote(alias)}`);
 		} else if (column.dataType === 'date') {
-			const granularity = column.pill.datePart ?? 'month';
+			const granularity = granularityFor(column);
 			selects.push(`DATE_TRUNC('${granularity}', ${ref}) as ${quote(alias)}`);
 			// Group by ordinal, and the ordinal is this column's position in the
 			// select list — not a running count of dimensions, which would group
@@ -469,10 +487,36 @@ const shelfOf = (spec, pill) => {
 };
 
 /**
+ * Where Cube is, resolved in the order that keeps one page working everywhere.
+ *
+ * These requests are made by the *browser*, so a hard-coded `http://localhost:4000`
+ * is not "the server" — it is whatever is listening on the reader's own machine.
+ * That is invisible while the only reader is the person who ran `npm run dev`,
+ * and it is a broken page for everyone else the moment the site is served from
+ * a real host.
+ *
+ * So the default is same-origin: `/cubejs-api/v1/...`, which the web server
+ * proxies to Cube on loopback (deploy/Caddyfile). Cube then never needs a public
+ * port, and the page has no idea where it lives.
+ *
+ * 1. an explicit `apiUrl` — tests and anything pointing at another deployment
+ * 2. `VITE_CUBE_API_URL` — set it to http://localhost:4000 in .env for local
+ *    dev, where Evidence is on :3000 and Cube is on :4000 with no proxy between
+ * 3. same origin
+ */
+const resolveApiUrl = (apiUrl) => {
+	if (apiUrl != null && apiUrl !== '') return String(apiUrl);
+	// import.meta.env exists under Vite; in plain node (the test suites) it does not.
+	const env = typeof import.meta !== 'undefined' ? import.meta.env : undefined;
+	return env?.VITE_CUBE_API_URL ?? '';
+};
+
+/**
  * A client for one Cube deployment.
  *
  * @param {object} config
- * @param {string} config.apiUrl base URL, with or without the /cubejs-api/v1 suffix
+ * @param {string} [config.apiUrl] base URL, with or without the /cubejs-api/v1
+ *   suffix. Omit it to use the same origin as the page — see resolveApiUrl.
  * @param {string} [config.token] JWT for the security context
  * @param {typeof fetch} [config.fetch]
  */
@@ -480,7 +524,7 @@ export const createCubeClient = ({ apiUrl, token, fetch: fetchImpl } = {}) => {
 	const doFetch = fetchImpl ?? (typeof fetch !== 'undefined' ? fetch : null);
 	if (!doFetch) throw new Error('No fetch implementation available for the Cube client');
 
-	const base = String(apiUrl ?? '').replace(/\/+$/, '').replace(/\/cubejs-api\/v1$/, '');
+	const base = resolveApiUrl(apiUrl).replace(/\/+$/, '').replace(/\/cubejs-api\/v1$/, '');
 	const headers = { 'content-type': 'application/json', ...(token ? { authorization: token } : {}) };
 
 	const request = async (path, init) => {

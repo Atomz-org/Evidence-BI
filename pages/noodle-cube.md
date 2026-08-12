@@ -29,7 +29,7 @@ dimension, a derived measure with no column behind it, and a join nothing on the
 page had to declare.
 
 <Studio
-    cube={{ apiUrl: 'http://localhost:4000' }}
+    cube={{}}
     storageKey="noodle.studio.cube.v1"
     starter={{
         version: 1,
@@ -95,10 +95,16 @@ page had to declare.
 
 <Alert status="info">
 
-This page needs a local Cube. Run <code>npm run sources</code> then
-<code>./cube/up.sh</code>. Without it the panel reports that it could not reach
-the model rather than falling back to ungoverned numbers — which is the correct
-failure for a governed surface.
+This page needs a running Cube. Locally: <code>npm run sources</code>, then
+<code>./cube/up.sh</code>, and put <code>VITE_CUBE_API_URL=http://localhost:4000</code>
+in <code>.env</code> — the dev server is on :3000 and Cube on :4000 with nothing
+between them. Deployed, the page calls <code>/cubejs-api</code> on its own origin
+and the web server proxies it to Cube on loopback, so no configuration is needed
+(<code>deploy/README.md</code>).
+
+Without a reachable Cube the panel reports that it could not reach the model
+rather than falling back to ungoverned numbers — which is the correct failure for
+a governed surface.
 
 </Alert>
 

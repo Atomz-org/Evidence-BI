@@ -2,7 +2,7 @@
   "name": "my-evidence-project",
   "version": "0.0.1",
   "scripts": {
-    "postinstall": "node scripts/apply-notebook-core.mjs",
+    "postinstall": "node scripts/apply-notebook-core.mjs && node scripts/build-rill-model.mjs",
     "notebooks": "node scripts/apply-notebook-core.mjs",
     "build": "evidence build",
     "build:strict": "evidence build:strict",
@@ -27,6 +27,12 @@
     "test:livequery": "node tests/t-livequery-ui.mjs",
     "test:screen": "node tests/t-screen.mjs",
     "test:notebook:ui": "node tests/t-notebook-ui.mjs",
+    "rill:model": "node scripts/build-rill-model.mjs",
+    "rill:up": "./rill/up.sh",
+    "test:rill": "node tests/t-rill.mjs",
+    "test:rill:ui": "node tests/t-rill-ui.mjs",
+    "test:canvas": "node tests/t-canvas.mjs",
+    "test:canvas:ui": "node tests/t-canvas-ui.mjs",
     "test:flint": "node tests/t-flint.mjs",
     "test:flint:ui": "node tests/t-flint-ui.mjs",
     "dashboard:audit": "node scripts/dashboard-audit.mjs"
@@ -35,13 +41,6 @@
     "npm": ">=7.0.0",
     "node": ">=18.0.0"
   },
-  "//browserslist": "Browserslist walks up the directory tree until it finds a package.json carrying this key. Without one here it keeps going past the repo and tries to parse whatever package.json happens to sit in a parent directory, which is where the 'Could not parse ...' warning comes from. These four queries are browserslist's own defaults, so stating them changes no output — it just stops the search at the project root.",
-  "browserslist": [
-    "> 0.5%",
-    "last 2 versions",
-    "Firefox ESR",
-    "not dead"
-  ],
   "type": "module",
   "dependencies": {
     "@evidence-dev/bigquery": "^2.0.12",
@@ -68,5 +67,11 @@
     "trim@<0.0.3": ">0.0.3",
     "sqlite3": "5.1.5",
     "axios": "^1.7.4"
-  }
+  },
+  "browserslist": [
+    "> 0.5%",
+    "last 2 versions",
+    "Firefox ESR",
+    "not dead"
+  ]
 }
