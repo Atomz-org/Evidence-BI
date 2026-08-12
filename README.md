@@ -512,8 +512,17 @@ If SQLite complains about a missing native binding after install:
 elsewhere — no managed database, no hosted semantic layer, no object store, no
 CDN — and without dropping a page, a connector or a surface.
 
-The site is static and every query runs in the reader's browser on duckdb-wasm,
-so serving costs ~20 MB and ten readers cost the same as one. The whole problem
+The site is static and on every page but one the queries run in the reader's
+browser on duckdb-wasm, so serving costs ~20 MB and ten readers cost the same as
+one. The exception is `/noodle-cube`, which is genuinely live: it calls
+`/cubejs-api` on its own origin, the web server proxies that to Cube on loopback
+(`deploy/Caddyfile`, `deploy/nginx.conf`), and with no Cube behind that proxy the
+page has no query engine — it refuses to fall back to ungoverned SQL rather than
+show a wrong number. `deploy/install.sh` provisions Cube natively and enables
+`evidence-cube.service`; a server that skips it serves every other page fine and
+`/noodle-cube` not at all. Cube is the only always-on process besides the web
+server — `/rill` compiles `rill/` to duckdb-wasm and needs no Rill running, and
+every other page is parquet in the browser. The whole problem
 is the *build*: measured cold, it needs >1792 MB of JavaScript heap and peaks
 near 2.8 GB, and Node's heap default is sized from visible RAM so on a 2 GB box
 it dies before swap is ever reached. `deploy/README.md` has the measurements and

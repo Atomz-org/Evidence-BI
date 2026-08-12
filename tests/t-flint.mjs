@@ -452,6 +452,23 @@ check('a value containing the delimiter survives the round trip', () => {
 	assert(toTsv([{ a: 'x\ty' }]).includes('"x\ty"'), 'a tab inside a TSV value must be quoted');
 });
 
+check('a cell a spreadsheet would execute is defused in both exports', () => {
+	// Excel and Sheets run a value opening with = + - @ or a control character.
+	// Both exports share one serializer, so both have to come out neutralized.
+	const rows = [{ note: '=HYPERLINK("http://evil","click")', cmd: '@SUM(A1)', minus: -5, dash: '-not a number' }];
+	const csv = toCsv(rows);
+	const tsv = toTsv(rows);
+	for (const [name, text] of [['csv', csv], ['tsv', tsv]]) {
+		assert(text.includes("'=HYPERLINK"), `${name} left a formula executable: ${text}`);
+		assert(text.includes("'@SUM(A1)"), `${name} left an @ command executable: ${text}`);
+		assert(text.includes("'-not a number"), `${name} left a leading dash executable: ${text}`);
+		// A number stays a number, or every negative column stops summing.
+		assert(!text.includes("'-5"), `${name} turned a negative number into text: ${text}`);
+	}
+	// The apostrophe goes on before quoting, so the quoting still applies.
+	assert(csv.includes('"\'=HYPERLINK(""http://evil"",""click"")"'), csv);
+});
+
 check('columns come from every row, not just the first', () => {
 	// A first row missing an optional column would otherwise drop it for all of
 	// them — the export would be silently narrower than the table on screen.

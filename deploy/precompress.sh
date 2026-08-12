@@ -31,16 +31,39 @@ EXTS='\.(js|mjs|css|html|json|svg|wasm|txt|map|webmanifest|arrow)$'
 COUNT=0
 printf '==> precompressing %s\n' "$DIR"
 
+# Both compressors create their output before they can fail, so writing straight
+# to "$f.br"/"$f.gz" leaves a truncated sibling behind on a kill or a full disk —
+# and the web server will happily hand that to the next client that negotiates
+# the encoding, which reads as a corrupt site rather than as a failed build.
+# Compress beside the target, rename only on success, and take the build down
+# with us if compression fails at all.
+TMP=""
+trap 'rm -f "$TMP"' EXIT
+
 # -j$(nproc) would be faster and is precisely what we must not do: parallel
 # brotli at maximum quality on a 38 MB wasm allocates a large window per worker.
 # One at a time keeps the peak bounded on a box that has none to spare.
 while IFS= read -r f; do
 	case "$f" in *.br|*.gz) continue ;; esac
 	if have brotli && [ ! -f "$f.br" ]; then
-		brotli --quality=11 --lgwin=24 --output="$f.br" "$f" 2>/dev/null || true
+		TMP="$(mktemp "$f.br.XXXXXX")"
+		# --force: mktemp has already created the file brotli would refuse to
+		# overwrite.
+		if ! brotli --force --quality=11 --lgwin=24 --output="$TMP" "$f"; then
+			rm -f "$TMP"; TMP=""
+			echo "brotli failed: $f" >&2
+			exit 1
+		fi
+		mv -f "$TMP" "$f.br"; TMP=""
 	fi
 	if have gzip && [ ! -f "$f.gz" ]; then
-		gzip -9 -c "$f" > "$f.gz" 2>/dev/null || true
+		TMP="$(mktemp "$f.gz.XXXXXX")"
+		if ! gzip -9 -c "$f" > "$TMP"; then
+			rm -f "$TMP"; TMP=""
+			echo "gzip failed: $f" >&2
+			exit 1
+		fi
+		mv -f "$TMP" "$f.gz"; TMP=""
 	fi
 	COUNT=$((COUNT + 1))
 done <<EOF

@@ -103,11 +103,15 @@ const inkSeries = (series, colour) => {
  */
 const paletteAssignments = (series, palette) => {
 	const byName = new Map();
-	for (const s of series ?? []) {
-		const key = s.name ?? `__unnamed_${byName.size}`;
+	// An unnamed series has no name to share, so it stands for itself — keyed by
+	// position, and by the *same* key when the colour is looked up again, or every
+	// nameless series falls back to slot 0 and the chart draws them all alike.
+	const keyOf = (s, i) => s?.name ?? `__unnamed_${i}`;
+	(series ?? []).forEach((s, i) => {
+		const key = keyOf(s, i);
 		if (!byName.has(key)) byName.set(key, byName.size);
-	}
-	return { byName, colourFor: (name) => palette[(byName.get(name) ?? 0) % palette.length] };
+	});
+	return { byName, colourFor: (s, i) => palette[(byName.get(keyOf(s, i)) ?? 0) % palette.length] };
 };
 
 /**
@@ -131,12 +135,12 @@ export const applyProjectTheme = (option, { mode = 'light', font, fmt, formats =
 	option.color = palette;
 
 	const { colourFor } = paletteAssignments(option.series, palette);
-	for (const s of option.series ?? []) {
+	(option.series ?? []).forEach((s, i) => {
 		// A single-series pie/treemap/sunburst colours its *slices*, not itself:
 		// leave those to `option.color` so each datum picks the next slot in order.
-		if (['pie', 'treemap', 'sunburst', 'funnel', 'sankey', 'graph'].includes(s.type)) continue;
-		inkSeries(s, colourFor(s.name));
-	}
+		if (['pie', 'treemap', 'sunburst', 'funnel', 'sankey', 'graph'].includes(s.type)) return;
+		inkSeries(s, colourFor(s, i));
+	});
 
 	// A continuous colour channel is one hue, light→dark, reversed on the dark
 	// surface so near-zero recedes into the page instead of glowing on it.

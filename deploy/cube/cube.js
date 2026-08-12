@@ -73,5 +73,10 @@ module.exports = {
 	// context to derive — the same position rill/README.md takes about
 	// `security:`. Cube is bound to loopback and reached only through Caddy's
 	// /cubejs-api proxy, which is the actual control.
+	//
+	// `apiSecret` is not set here on purpose, even though Cube accepts it in
+	// this file. This file is committed; the secret is a secret. Cube reads
+	// CUBEJS_API_SECRET from the environment, which deploy/env supplies to
+	// evidence-cube.service — see deploy/env.example for how to generate it.
 	checkAuth: (req, auth) => {}
 };

@@ -102,16 +102,27 @@ than the most things.
 Cost order says the wrong number comes first. There is one here that the audit
 cannot see: `${saved_weekly_revenue_by_region}` was queried with no date bound,
 so the KPI sums all history and the "weekly" trend runs to the beginning of the
-data. The filter row fixes the trend; the KPI needs a prior-period CTE to have
-something to compare against at all.
+data. The filter row fixes the trend; the KPI needs a bounded period and a
+prior-period CTE to have something to compare against at all.
 
 ```sql
-with cur as (select sum(revenue) as revenue, sum(order_count) as order_count from ${weekly}),
-     prev as (select sum(revenue) as revenue from ${weekly} where week < (select max(week) from ${weekly}))
+with bounds as (select max(week) as latest from ${weekly}),
+     cur as (select sum(revenue) as revenue, sum(order_count) as order_count
+             from ${weekly}, bounds
+             where week > latest - interval 12 week and week <= latest),
+     prev as (select sum(revenue) as revenue
+              from ${weekly}, bounds
+              where week > latest - interval 24 week and week <= latest - interval 12 week)
 select cur.revenue, cur.order_count,
        (cur.revenue - prev.revenue) / nullif(prev.revenue, 0) as revenue_growth
 from cur, prev
 ```
+
+Both windows are twelve weeks and neither overlaps the other, which is the part
+that is easy to get wrong: a "current" figure over all history compared against a
+"prior" figure over most of that same history is not a period-on-period change,
+it is two different periods divided by each other. Same duration, adjacent, half
+open at the same end — then the ratio means something.
 
 With `revenue_growth` available, both `BigValue`s get a reference — a comparison
 on revenue, a sparkline on orders.
@@ -145,7 +156,7 @@ no region and are excluded. Not net of refunds.
 
 <Grid cols=2>
     <BigValue data={kpi} value=revenue fmt=usd0k title="Revenue"
-        comparison=revenue_growth comparisonFmt=pct1 comparisonTitle="vs prior weeks"/>
+        comparison=revenue_growth comparisonFmt=pct1 comparisonTitle="vs prior 12 weeks"/>
     <BigValue data={kpi} value=order_count fmt=num0 title="Orders"
         sparkline=week/>
 </Grid>

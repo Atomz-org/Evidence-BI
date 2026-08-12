@@ -47,6 +47,12 @@ Environment=CUBEJS_TIMEZONE=UTC
 Environment=CUBEJS_API_ADDRESS=127.0.0.1
 Environment=PORT=4000
 
+# CUBEJS_API_SECRET is required and is deliberately NOT set above: unit files in
+# /etc/systemd/system are world-readable, and a secret in one is a secret every
+# account on the box can read. It comes from deploy/env instead, which install.sh
+# lays down owned by `evidence` — deploy/env.example documents how to generate
+# it. Without it Cube exits at startup in production mode, which presents as a
+# restart loop here and an empty /noodle-cube on the site.
 EnvironmentFile=-/srv/evidence/app/deploy/env
 
 ExecStart=/usr/bin/node node_modules/.bin/cubejs-server

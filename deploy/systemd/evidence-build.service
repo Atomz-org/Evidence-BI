@@ -47,6 +47,18 @@ TimeoutStartSec=45min
 
 ExecStart=/srv/evidence/app/deploy/build.sh
 
+# build.sh restores Cube from an EXIT trap, which covers a clean exit and a
+# SIGTERM — and neither of those is how this unit dies on a bad day. An OOM
+# SIGKILL and systemd's own timeout escalation both skip the trap, and
+# Conflicts= above only ever stops units, it never starts them back. Without
+# this the semantic layer stays down until the next build happens to succeed.
+#
+# The leading `+` is not decoration: this unit runs as `evidence`, which has no
+# business controlling systemd units, so an unprefixed hook would simply be
+# denied. --no-block because starting the unit we conflict with, while we are
+# still deactivating, would otherwise wait on our own shutdown.
+ExecStopPost=+/usr/bin/systemctl start --no-block evidence-cube.service
+
 # If the build dies, the previous release is still live via the `current`
 # symlink — there is nothing to roll back, only to report.
 SuccessExitStatus=0

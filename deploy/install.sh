@@ -160,10 +160,20 @@ sudo -u postgres psql -qc "select 1 from pg_database where datname='evidence'" |
 	|| sudo -u postgres createdb -O evidence evidence
 
 # Sources must run once before there is parquet to seed from.
-sudo -u evidence env NODE_OPTIONS=--max-old-space-size=1024 \
-	npx --prefix "$APP" evidence sources 2>/dev/null || true
-sudo -u evidence "$APP/deploy/datasources/seed.sh" || \
-	echo "    seed skipped — run deploy/datasources/seed.sh once parquet exists"
+#
+# The cd is load-bearing. `npx --prefix` only says where to resolve the package
+# from; the child still runs in the caller's directory, so `evidence sources`
+# would read the wrong project and write its parquet outside $APP. And the
+# extraction is not optional here — swallowing its exit status leaves an empty
+# .evidence/template/static/data that the seed and the first build then quietly
+# build on top of.
+(cd "$APP" && sudo -u evidence env NODE_OPTIONS=--max-old-space-size=1024 \
+	npx evidence sources)
+
+# seed.sh already refuses loudly when the parquet is missing, so a failure here
+# is a real one. Reporting it as "skipped" produced two empty ADBC fixtures and
+# a site that only looks correct until someone opens the ADBC page.
+sudo -u evidence "$APP/deploy/datasources/seed.sh"
 systemctl stop postgresql clickhouse-server
 
 log "first build"

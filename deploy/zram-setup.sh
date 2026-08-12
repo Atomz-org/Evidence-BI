@@ -50,8 +50,16 @@ if [ -d /usr/lib/systemd/system-generators ] && \
 else
 	echo "    zram-generator unavailable; configuring /dev/zram0 directly"
 	zramctl --reset /dev/zram0 2>/dev/null || true
-	zramctl --find --size "$ZRAM_SIZE" --algorithm zstd >/tmp/zramdev
-	DEV="$(cat /tmp/zramdev)"
+	# A predictable /tmp path is a hole in a script that runs as root: any local
+	# account can pre-create it as a symlink and the redirection below follows
+	# it, so this would truncate a file of their choosing (CWE-377). mktemp gets
+	# a name nobody can guess and a file nobody else owns.
+	TMPDEV="$(mktemp)"
+	trap 'rm -f "$TMPDEV"' EXIT
+	zramctl --find --size "$ZRAM_SIZE" --algorithm zstd >"$TMPDEV"
+	DEV="$(cat "$TMPDEV")"
+	rm -f "$TMPDEV"
+	trap - EXIT
 	mkswap "$DEV" >/dev/null
 	swapon --priority 100 "$DEV"
 fi

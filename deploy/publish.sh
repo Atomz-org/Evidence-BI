@@ -61,7 +61,37 @@ fi
 STAMP="$(date +%Y%m%d-%H%M%S)"
 REMOTE="$SERVE_ROOT/releases/$STAMP"
 
+# deploy/install.sh gives $SERVE_ROOT to the `evidence` user, and everything
+# below — mkdir, rsync, the symlink swap, the release prune — runs as whichever
+# account you ssh in as. Any other account fails somewhere in the middle of
+# that, and the middle is the one place this is not safe to fail: a release
+# directory half-populated, or fully populated with `current` never flipped.
+# Ask the question once, before a single byte has moved.
+#
+# The variables below are meant to expand on THIS side (shellcheck SC2029) —
+# $SERVE_ROOT is the local setting being asserted about the remote box — so
+# they are single-quoted for the remote shell rather than escaped.
+log "checking $TARGET can write $SERVE_ROOT"
+# shellcheck disable=SC2029
+ssh "$TARGET" "test -w '$SERVE_ROOT' && test -w '$SERVE_ROOT/releases'" || {
+	cat >&2 <<-MSG
+
+	$TARGET cannot write $SERVE_ROOT/releases.
+
+	deploy/install.sh owns that tree as the 'evidence' user. Publish as an
+	account that can write it — either be a member of the evidence group:
+
+	    sudo usermod -aG evidence <the ssh user>
+	    sudo chmod -R g+w $SERVE_ROOT
+
+	or run install.sh with SERVE_ROOT pointed somewhere you own and pass the
+	same SERVE_ROOT here.
+	MSG
+	exit 1
+}
+
 log "shipping to $TARGET:$REMOTE"
+# shellcheck disable=SC2029  # $REMOTE is computed here; it must expand locally
 ssh "$TARGET" "mkdir -p '$REMOTE'"
 
 # --link-dest hard-links every file that is byte-identical to the live release,
@@ -75,6 +105,7 @@ rsync -a --delete --info=stats1 \
 # Atomic: readers mid-request finish against the old release, the next request
 # gets the new one, and the site is never down.
 log "publishing"
+# shellcheck disable=SC2029  # both paths are decided here and expand locally
 ssh "$TARGET" "
 	set -e
 	ln -sfn '$REMOTE' '$SERVE_ROOT/current.new'

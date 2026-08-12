@@ -61,6 +61,24 @@ const quote = (text, sep) =>
 		: text;
 
 /**
+ * Defuse a cell a spreadsheet would run instead of read.
+ *
+ * Excel and Sheets treat a value opening with `=`, `+`, `-`, `@`, a tab or a
+ * carriage return as a formula, so a string that arrived from the database ends
+ * up executing on the machine of whoever opens the export — the one place in
+ * this project where a governed number turns into somebody else's code. A
+ * leading apostrophe is the mitigation both applications honour: the cell is
+ * then text, and the apostrophe is not part of it.
+ *
+ * A plain number is deliberately exempt. `-5` prefixed would land as text and
+ * every column holding a negative would stop summing, which is a real cost
+ * against no risk — a value that is only digits cannot be a formula.
+ */
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+const NUMERIC = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+const neutralize = (text) => (FORMULA_LEAD.test(text) && !NUMERIC.test(text) ? `'${text}` : text);
+
+/**
  * Which columns, in which order, under which headings.
  *
  * Given nothing, the keys of the widest row — "widest" because a first row that
@@ -86,8 +104,8 @@ export const columnsOf = (rows, columns) => {
 /** Rows → delimited text, header row included. */
 export const toDelimited = (rows, { columns, sep = '\t' } = {}) => {
 	const cols = columnsOf(rows, columns);
-	const lines = [cols.map((c) => quote(String(c.label), sep)).join(sep)];
-	for (const row of rows ?? []) lines.push(cols.map((c) => quote(cellText(row?.[c.key]), sep)).join(sep));
+	const lines = [cols.map((c) => quote(neutralize(String(c.label)), sep)).join(sep)];
+	for (const row of rows ?? []) lines.push(cols.map((c) => quote(neutralize(cellText(row?.[c.key])), sep)).join(sep));
 	return lines.join('\n');
 };
 
