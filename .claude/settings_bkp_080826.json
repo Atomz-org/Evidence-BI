@@ -1,15 +1,13 @@
 {
- 
   "permissions": {
+    "//": "Kept only as a record of an earlier policy. It is held to the same restrictions as settings.json on purpose: a backup is one `cp` away from being the live policy, so it must never be the permissive copy someone restores by accident. If you no longer need the record, delete this file rather than loosening it.",
+    "defaultMode": "default",
     "allow": [
-      "Bash(podman rm *)",
-      "Bash(podman run *)",
-      "Bash(node -e ' *)",
-      "Bash(podman ps *)",
-      "Bash(kill -9 48968)",
-      "Bash(node t-cube.mjs)",
-      "Bash(node t-noodle.mjs)"
+      "Bash(npm run test:*)",
+      "Bash(node tests/t-*.mjs)",
+      "Bash(podman ps)",
+      "Bash(podman ps -a)",
+      "Bash(podman logs *)"
     ]
   }
-
 }

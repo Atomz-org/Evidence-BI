@@ -1,18 +1,22 @@
 {
-  
-   "permissions": {
-    "defaultMode": "auto",
+  "permissions": {
+    "//": "Checked into the repo, so it applies to everyone who opens this project. Keep it to commands that only read state or run this project's own scripts. `defaultMode: default` means anything not listed here is confirmed by a human first — do not set it to auto/bypassPermissions here; put personal conveniences in .claude/settings.local.json, which is gitignored.",
+    "defaultMode": "default",
     "allow": [
-      "Bash(rtk *)",
-      "Bash(podman *)",
-      "Bash(podman run *)",
-      "Bash(node *)",
-      "Bash(podman ps *)",
-      "Bash(kill -9 48968)",
-      "Bash(node t-cube.mjs)",
-      "Bash(node t-noodle.mjs)"
+      "Bash(npm run test:*)",
+      "Bash(npm run sources)",
+      "Bash(npm run build)",
+      "Bash(npm run rill:model)",
+      "Bash(node tests/t-*.mjs)",
+      "Bash(node scripts/build-rill-model.mjs)",
+      "Bash(node --check *)",
+      "Bash(podman ps)",
+      "Bash(podman ps -a)",
+      "Bash(podman logs *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)"
     ]
   }
-
-
 }

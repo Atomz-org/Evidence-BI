@@ -271,16 +271,37 @@
 		if (!tile) return;
 		editingId = tileId;
 		editorSpec = tile.spec ?? emptySpec(cube ? null : (tables[0] ?? null));
+		appliedSpec = editorSpec;
 	};
 
 	const closeEditor = () => {
 		editingId = null;
 		editorSpec = null;
+		appliedSpec = null;
 	};
 
 	// Live: the grid behind the drawer updates as the view is built, so the tile is
 	// judged in its context rather than in isolation.
-	$: if (editingId && editorSpec) dashboard = updateTile(dashboard, editingId, { spec: editorSpec });
+	//
+	// The write is deliberately kept out of the reactive statement itself.
+	// `updateTile` returns a fresh dashboard every call, so a statement that both
+	// reads and assigns `dashboard` re-dirties its own dependency and re-runs for
+	// as long as the drawer is open — and Svelte 4's scheduler has no iteration
+	// cap to break out of that, so the tab simply locks up. Calling out to a
+	// function keeps `dashboard` out of this statement's dependency set, and
+	// `appliedSpec` collapses the repeats into one write per actual edit.
+	let appliedSpec = null;
+	$: if (editingId && editorSpec && editorSpec !== appliedSpec) {
+		appliedSpec = editorSpec;
+		applyEditorSpec(editingId, editorSpec);
+	}
+
+	const applyEditorSpec = (tileId, spec) => {
+		// The tile can be deleted while its editor is open.
+		const tile = dashboard.tiles.find((t) => t.id === tileId);
+		if (!tile || tile.spec === spec) return;
+		dashboard = updateTile(dashboard, tileId, { spec });
+	};
 
 	/* -------------------------------------------------------------- filters -- */
 
