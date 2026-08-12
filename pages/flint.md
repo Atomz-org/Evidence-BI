@@ -6,7 +6,7 @@ queries:
 ---
 
 `<FlintChart>` describes a chart by what the data **means** — `Amount`, `Region`,
-`Date` — and lets [Flint](https://github.com/PackMaaan/flint-chart) derive the
+`Date` — and lets [Flint](https://github.com/microsoft/flint-chart) derive the
 layout: axis steps, label rotation, legend placement, when a dense axis has to
 wrap into facets, how much canvas the whole thing needs. Colour is **not** Flint's:
 every chart below is re-inked from the validated palette in `evidence.config.yaml`

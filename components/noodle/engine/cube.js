@@ -384,6 +384,24 @@ export const toCubeSql = (catalog, spec) => {
 	const cubeOf = (memberId) => memberId.split('.')[0];
 	const quote = (name) => `"${String(name).replace(/"/g, '""')}"`;
 
+	// `datePart` reaches here from a spec, and a spec is deserialized from
+	// localStorage or hand-authored in a `starter=` block — untrusted input that
+	// lands inside a SQL string literal. It is checked against the granularities
+	// the field itself declares rather than a fixed list, because a Cube model
+	// may add its own on top of CUBE_GRANULARITIES and those are legitimate.
+	// A rejected value is reported, not silently swapped: quietly answering at a
+	// different grain would be a wrong number wearing the right label.
+	const granularityFor = (column) => {
+		const requested = column.pill.datePart;
+		if (!requested) return 'month';
+		const allowed = catalog.byId?.[column.pill.fieldId]?.granularities ?? CUBE_GRANULARITIES;
+		if (allowed.includes(requested)) return requested;
+		warnings.push(
+			`${column.pill.fieldId}: unknown granularity "${requested}" — grouped by month instead.`
+		);
+		return 'month';
+	};
+
 	for (const column of columns) {
 		const memberId = column.pill.fieldId;
 		usedCubes.add(cubeOf(memberId));
@@ -393,7 +411,7 @@ export const toCubeSql = (catalog, spec) => {
 		if (column.role === 'measure') {
 			selects.push(`MEASURE(${ref}) as ${quote(alias)}`);
 		} else if (column.dataType === 'date') {
-			const granularity = column.pill.datePart ?? 'month';
+			const granularity = granularityFor(column);
 			selects.push(`DATE_TRUNC('${granularity}', ${ref}) as ${quote(alias)}`);
 			// Group by ordinal, and the ordinal is this column's position in the
 			// select list — not a running count of dimensions, which would group
