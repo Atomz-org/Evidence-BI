@@ -9,14 +9,29 @@
       "Bash(npm run rill:model)",
       "Bash(node tests/t-*.mjs)",
       "Bash(node scripts/build-rill-model.mjs)",
-      "Bash(node --check *)",
       "Bash(podman ps)",
       "Bash(podman ps -a)",
       "Bash(podman logs *)",
       "Bash(git status)",
-      "Bash(git diff *)",
-      "Bash(git log *)",
-      "Bash(git show *)"
+      "Bash(git status --short)",
+      "Bash(git diff)",
+      "Bash(git diff --stat)",
+      "Bash(git diff --name-only)",
+      "Bash(git diff --cached)",
+      "Bash(git diff --cached --stat)",
+      "Bash(git log --oneline)",
+      "Bash(git show --stat)"
+    ],
+    "//deny": "Two families of option turn an otherwise read-only command into a write or an execution, which is why the entries above are spelled out rather than wildcarded. git: `--output=<path>` writes a file anywhere the user can write, and `--ext-diff` runs whatever `diff.<driver>.command` names — both reachable from diff, log and show, and both verified. node: `--require`/`--import` preload and execute a module before the script does anything, so even `node --check` runs code. A trailing wildcard cannot exclude an option that may appear at any argument position, so these deny rules are the backstop for a wildcard finding its way back in.",
+    "deny": [
+      "Bash(git * --output*)",
+      "Bash(git * --ext-diff*)",
+      "Bash(node * --require*)",
+      "Bash(node * -r *)",
+      "Bash(node * --import*)",
+      "Bash(node * --experimental-loader*)",
+      "Bash(node * --eval*)",
+      "Bash(node * -e *)"
     ]
   }
 }
